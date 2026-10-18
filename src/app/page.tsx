@@ -7,95 +7,101 @@ const CONTACT_EMAIL = "newlauren.94@gmail.com";
 const CONTACT_PHONE = "2062067155";
 const DISPLAY_PHONE = "(206) 206-7155";
 
-// Customers must sign in before proceeding to booking.
-// The login/signup pages should preserve the next destination.
 const LOGIN_FOR_BOOKING = "/login?next=%2Fbook";
 const SIGNUP_FOR_BOOKING = "/signup?next=%2Fbook";
 
 const services = [
   {
     number: "01",
-    
-    title: "Dog Walking",
+    id: "boarding",
+    title: "Boarding",
     description:
-      "Fresh air, exercise, and one-on-one attention. Every walk is tailored to your dog's pace and routine. Doggie bags are included, and we clean up after your dog during walks.",
-    rates: ["30 minutes — $30", "60 minutes — $50"],
+      "A cozy stay in an employee’s home. We’ll ask how your dog does around other pets and match them with a caregiver who fits.",
+    rates: [
+      "Standard boarding — $40/night",
+      "Solo care, no other pets — $60/night",
+      "Pickup or drop-off — $20 each way",
+    ],
     image:
-      "https://images.openai.com/static-rsc-4/oNLD51yUj8KS5QZS3sJpoOOGP98mODmWqopQedy5GC2u9-A6W6a8Q7MFQO61OhDfu7d5Yw-BGBXIG-7td25tBGRPy2Oi_GjMYCv0PZK-1YX7SO-G49iLLbWDvnZiWJqROeYGKL4GtPCVLDSI4dxXVLO-G3HrDqa_fQc-fiT2RGQ?purpose=inline",
-    imageAlt: "Dog walking outdoors",
+      "https://cdn.shopify.com/s/files/1/0268/7349/5624/files/Is_boarding_traumatic_for_your_dog.jpg?v=1740765074&width=1200&height=500&crop=center",
+    imageAlt: "Dogs spending time together in a boarding yard",
+    href: "/booking-request?service=Boarding",
+    action: "Ask about boarding",
+    contactOnly: true,
   },
   {
     number: "02",
-    
-    title: "Drop-In Visits",
+    id: "house-sitting",
+    title: "House Sitting",
     description:
-      "Potty breaks, fresh water, meals, playtime, and companionship in the comfort of your pet's home.",
-    rates: ["30 minutes — $30", "45 minutes — $40"],
+      "Comforting care in your own home, keeping your pet close to familiar routines while you’re away.",
+    rates: ["Flexible overnight, 8 PM–7 AM — $80/night", "Dedicated overnight, 10 PM–7 AM — $100/night"],
     image:
-      "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Dog spending time outdoors",
+      "https://images.unsplash.com/photo-1760791511030-ddad4c350cbb?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "Dog relaxing comfortably at home",
+    href: "/booking-request?service=House%20Sitting",
+    action: "Explore house sitting",
+    contactOnly: false,
   },
   {
     number: "03",
-    
-    title: "Poop Pickup & Yard Cleanup",
+    id: "drop-ins",
+    title: "Drop-In Visits",
     description:
-      "Enjoy a cleaner yard without the hassle. We scoop, bag, and remove dog waste, leaving your outdoor space ready for play.",
-    rates: [
-      "One-time cleanup — $30",
-      "Approximately 20–30 minutes",
-      "Ask about regular weekly cleanups",
-    ],
+      "Thoughtful check-ins at home for dogs and cats: feeding, fresh water, play, and companionship. Medication support is available for an extra fee.",
+    rates: ["30 minutes — $30", "45 minutes — $40", "Medication — +$5/visit"],
     image:
-      "https://images.unsplash.com/photo-1601758125946-6ec2ef64daf8?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Dog enjoying time outdoors",
+      "https://images.unsplash.com/photo-1616715655554-682697b9128b?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "Cat resting comfortably at home",
+    href: "/booking-request?service=Drop-In%20Visits",
+    action: "Book a drop-in",
+    contactOnly: false,
   },
   {
     number: "04",
-    
-    title: "Dog Bathing",
+    id: "day-care",
+    title: "Doggy Day Care",
     description:
-      "Give your pup a fresh start with a basic bath, rinse, and towel dry. Bathing is available for dogs only.",
-    rates: [
-      "Small dogs — $25",
-      "Medium dogs — $35",
-      "Large dogs — $45+",
-    ],
+      "A friendly, supervised group day from 8:00 AM–5:00 PM, with drop-off from 7:30 AM. Dogs can play and socialize together.",
+    rates: ["Group day care — $35/day"],
     image:
-      "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Dog enjoying gentle care",
+      "https://images.unsplash.com/photo-1638766211645-505c1c678b2b?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "A group of dogs playing in a sunlit grassy park",
+    href: "/booking-request?service=Doggy%20Day%20Care",
+    action: "Book day care",
+    contactOnly: false,
   },
   {
     number: "05",
-    
-    title: "Pet Sitting & Overnight Care",
+    id: "dog-walking",
+    title: "Dog Walking",
     description:
-      "Comfortable in-home care with familiar routines, evening attention, and morning care.",
-    rates: [
-      "Flexible overnight — $80/night",
-      "Dedicated overnight — $100/night",
-    ],
+      "Fresh air, exercise, and one-on-one attention. Every walk is tailored to your dog’s pace and routine. Doggie bags are included.",
+    rates: ["30 minutes — $30", "60 minutes — $50"],
     image:
-      "https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Dog relaxing comfortably",
+      "https://images.unsplash.com/photo-1758633226887-8a1164f408a7?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "A person walking a dog through a grassy park",
+    href: "/booking-request?service=Dog%20Walking",
+    action: "Book a dog walk",
+    contactOnly: false,
   },
 ];
 
 const values = [
   {
     icon: "♡",
-    title: "Care comes first",
-    text: "Every pet has their own personality, routine, and needs. We treat them as individuals.",
+    title: "Care shaped around your pet",
+    text: "Visits follow your pet’s routine, pace, and comfort, with attention to the little details that help them feel at home.",
   },
   {
     icon: "✳",
-    title: "Reliable & thoughtful",
-    text: "We know your pets are family. Clear communication and thoughtful care matter.",
+    title: "Attentive, gentle visits",
+    text: "From feeding and fresh water to playtime and companionship, each check-in is centered on what your pet needs.",
   },
   {
     icon: "⌂",
-    title: "Peace of mind",
-    text: "Your pet's comfort and safety guide every visit and walk.",
+    title: "Peace of mind for you",
+    text: "Medication support is available during drop-ins for an additional $5 per visit, with clear instructions from you.",
   },
 ];
 
@@ -183,10 +189,12 @@ export default function Home() {
           }
         >
           <a href="#services" onClick={closeMenu}>
-            Services & Pricing
+            Our Services
           </a>
 
-          
+          <a href={`mailto:${CONTACT_EMAIL}?subject=Join%20our%20team`} onClick={closeMenu}>
+            Join Our Team
+          </a>
 
           <a href="/login" onClick={closeMenu}>
             Sign In
@@ -234,7 +242,7 @@ export default function Home() {
           </div>
 
           <div className="hero-footnote">
-            WALKING · DROP-INS · YARD CLEANUP · BATHING · OVERNIGHT CARE
+            BOARDING · HOUSE SITTING · DROP-INS · DOGGY DAY CARE · DOG WALKING
           </div>
         </div>
 
@@ -259,94 +267,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CUSTOMER ACCOUNT PROMPT */}
-      {/* CUSTOMER ACCOUNT PROMPT */}
-      <section className="intro section-pad">
-        <div className="section-label">
-          YOUR PET'S CARE, ALL IN ONE PLACE
-        </div>
-
-        <div className="intro-grid">
-          <h2>
-            More tail wags.
-            <br />
-            <span>Less to worry about.</span>
-          </h2>
-
-          <div className="intro-copy">
-            <p>
-              Create your customer account to keep your pets' information
-              organized, request appointments, and manage your bookings
-              in one convenient place.
-            </p>
-
-            <div className="intro-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'flex-start', marginTop: '1.5rem' }}>
-              <a 
-                className="button button-green" 
-                href={SIGNUP_FOR_BOOKING}
-                style={{ borderRadius: '9999px' }}
-              >
-                Create your account 
-              </a>
-
-              <a 
-                className="button button-green" 
-                href={LOGIN_FOR_BOOKING}
-                style={{ borderRadius: '9999px' }}
-              >
-                Manage your appointments 
-              </a>
-
-              <p className="signin-text" style={{ margin: '0.25rem 0 0 0' }}>
-                Already have an account?{" "}
-                <a className="underlined-link" href="/login">
-                  Sign in here 
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="intro-stamp" aria-hidden="true">
-          ALL PAWS
-          <br />
-          WELCOME <span>♡</span>
+      <section className="account-strip" aria-label="Customer account">
+        <p>Pet details, appointment requests, and bookings—all in one place.</p>
+        <div>
+          <a href={SIGNUP_FOR_BOOKING}>Create an account</a>
+          <a href={LOGIN_FOR_BOOKING}>Customer sign in</a>
         </div>
       </section>
 
       {/* SERVICES AND PRICING */}
       <section className="services section-pad" id="services">
-        <div className="section-heading">
+          <div className="section-heading">
           <div>
             <div className="section-label">
-              OUR SERVICES & PRICING
+              THOUGHTFUL CARE FOR EVERY KIND OF DAY
             </div>
 
             <h2>
-              A little care.
+              What kind of care
               <br />
-              <span>A lot of happy.</span>
+              <span>does your pet need?</span>
             </h2>
           </div>
 
           <p>
-            Thoughtful care, straightforward pricing, and happy tails.
-            Find the right fit for your best friend.
+            From neighborhood walks to cozy stays, find care that fits your
+            pet&apos;s routine and comfort.
           </p>
         </div>
 
         <div className="service-grid">
           {services.map((service) => (
-            <article className="service-card" key={service.number}>
+            <article className="service-card" id={service.id} key={service.number}>
               <a
                 className="service-photo"
-                href={LOGIN_FOR_BOOKING}
-                style={{
-                  backgroundImage: `url("${service.image}")`,
-                }}
-                aria-label={`Sign in to book ${service.title}`}
+                href={service.href}
+                aria-label={`${service.action}: ${service.title}`}
               >
-                
+                <img
+                  className="service-photo-image"
+                  src={service.image}
+                  alt={service.imageAlt}
+                  loading="lazy"
+                  decoding="async"
+                />
               </a>
 
               <div className="service-card-content">
@@ -363,14 +327,14 @@ export default function Home() {
                 </div>
 
                 <div className="service-card-bottom">
-                  <span>Ready when you are</span>
+                  <span>Reviewed by our team before confirmation</span>
 
                   <a
                     className="book-now-button"
-                    href={LOGIN_FOR_BOOKING}
-                    aria-label={`Sign in to book ${service.title}`}
+                    href={service.href}
+                    aria-label={service.action}
                   >
-                    Book Now 
+                    Book Now
                   </a>
                 </div>
               </div>
@@ -379,10 +343,9 @@ export default function Home() {
         </div>
 
         {/* ADDITIONAL PRICING DETAILS */}
-        <div className="pricing-note">
-          <div className="pricing-note-heading">
-            A few helpful details
-          </div>
+        <details className="pricing-note">
+          <summary className="pricing-note-heading">Service details, add-ons &amp; discounts</summary>
+          <div className="pricing-note-content">
 
           <p>
             <strong>Dog Walking:</strong> Doggie bags are included.
@@ -390,17 +353,32 @@ export default function Home() {
           </p>
 
           <p>
-            <strong>Poop Pickup:</strong> One-time yard cleanup starts
-            at $30 We scoop, bag, and
-            remove the waste. Ask us about regular weekly cleanups.
-            
+            <strong>Bathing & Yard Cleanup Add-ons:</strong> Bathing and
+            poop pickup are available by arrangement alongside a booked
+            walk, drop-in, or overnight service. Bathing starts at $25 for
+            small dogs, $35 for medium dogs, and $45+ for large dogs.
+            Yard cleanup starts at $30. Ask about weekly cleanup visits.
           </p>
 
           <p>
-            <strong>Dog Bathing:</strong> Basic bath, rinse, and towel
-            dry. Starting prices are $25 for small dogs, $35 for medium
-            dogs, and $45+ for large dogs. Dogs only; nail trimming is
-            not offered.** 
+            <strong>Vet Transportation:</strong> Before we can provide a
+            ride, we&apos;ll confirm availability and the required signed
+            authorization, appointment details, clinic contact, emergency
+            contact, and relevant pet-care information with you.
+          </p>
+
+          <p>
+            <strong>Doggy Day Care:</strong> Supervised group care is $35/day.
+            Day care runs 8:00 AM–5:00 PM, with drop-off from 7:30–8:00 AM
+            and pickup by 5:00 PM. We&apos;ll review each dog&apos;s comfort
+            around other dogs before confirming.
+          </p>
+
+          <p>
+            <strong>Boarding:</strong> Standard boarding is $40 per night;
+            solo care with no other pets present is $60 per night. Pickup or drop-off is $20 each way
+            within our service area. We&apos;ll confirm the home setup, pet
+            compatibility, and transportation details before accepting a stay.
           </p>
 
           <p>
@@ -416,22 +394,25 @@ export default function Home() {
           </p>
 
           <p>
-            <strong>Medication Administration:</strong> +$5 per visit
+            <strong>Medication during Drop-In Visits:</strong> +$5 per visit.
+            Please include the medication name, dose, timing, and instructions
+            with your request.
           </p>
 
           <p>
-            <strong>Flexible Overnight — $80/night:</strong> Includes
-            agreed-upon evening and morning care and an overnight stay.
-            Other scheduled pet visits may require leaving for a couple
-            of hours by prior agreement, provided your pet can safely
-            be left alone.
+            <strong>Flexible Overnight — $80/night:</strong> Care begins at
+            8:00 PM after the caregiver&apos;s other appointments, and runs
+            until 7:00 AM. Add up to two morning hours for $20, with
+            departure by 9:00 AM.
           </p>
 
           <p>
-            <strong>Dedicated Overnight — $100/night:</strong> Includes
-            an overnight stay without leaving for other pet appointments.
+            <strong>Dedicated Overnight — $100/night:</strong> Care runs
+            from 10:00 PM to 7:00 AM without the caregiver leaving for other
+            pet appointments.
           </p>
-        </div>
+          </div>
+        </details>
         
       </section>
 
@@ -454,7 +435,13 @@ export default function Home() {
           
           <a href="/signup">Create Account</a>
           <a href="/login">Sign In</a>
-          <a href={LOGIN_FOR_BOOKING}>Book / Manage an Appointment</a>
+          <a
+            href="https://www.facebook.com/profile.php?id=61595580778675"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Facebook
+          </a>
           
         </div>
 

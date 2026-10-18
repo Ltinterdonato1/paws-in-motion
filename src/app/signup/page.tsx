@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import Brand from "@/components/Brand";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -85,9 +86,7 @@ export default function SignUpPage() {
   return (
     <main className="account-page">
       <section className="account-card">
-        <Link href="/" className="account-brand">
-          Paws in Motion
-        </Link>
+        <Brand className="account-brand" />
 
         <p className="account-eyebrow">WELCOME</p>
 

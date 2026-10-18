@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import Brand from "@/components/Brand";
 
 type Pet = {
   id: string;
@@ -75,11 +76,10 @@ function formatTimeLabel(time: string) {
   return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-const OVERNIGHT_CHECKIN_OPTIONS = buildTimeOptions("18:00", "23:30");
-const OVERNIGHT_CHECKOUT_OPTIONS = buildTimeOptions("00:00", "07:00");
+const FLEXIBLE_OVERNIGHT_START = "20:00";
+const DEDICATED_OVERNIGHT_START = "22:00";
 const DROP_IN_START_OPTIONS = buildTimeOptions("06:00", "22:00");
 
-const OVERNIGHT_START_TIME = "18:00";
 const OVERNIGHT_END_TIME = "07:00";
 
 const SERVICE_OPTIONS: Record<ServiceName, ServiceOption[]> = {
@@ -324,12 +324,15 @@ function isOvernightService(draft: ServiceDraft) {
 function getOvernightTimeError(draft: ServiceDraft) {
   if (!isOvernightService(draft)) return "";
 
-  if (!OVERNIGHT_CHECKIN_OPTIONS.includes(draft.startTime)) {
-    return "Please choose an overnight check-in time between 6:00 PM and 11:30 PM.";
+  const expectedStart = draft.serviceOption === "Dedicated overnight"
+    ? DEDICATED_OVERNIGHT_START
+    : FLEXIBLE_OVERNIGHT_START;
+  if (draft.startTime !== expectedStart) {
+    return `Please choose the ${formatTimeLabel(expectedStart)} start time for this overnight option.`;
   }
 
-  if (!OVERNIGHT_CHECKOUT_OPTIONS.includes(draft.endTime)) {
-    return "Please choose a checkout time between 12:00 AM and 7:00 AM.";
+  if (draft.endTime !== OVERNIGHT_END_TIME) {
+    return "Overnight care ends at 7:00 AM.";
   }
 
   return "";
@@ -421,9 +424,13 @@ const [today, setToday] = useState("");
 
         if (serviceChanged) {
           updated.serviceOption = SERVICE_OPTIONS[updated.serviceName][0];
+          if (updated.serviceName !== "Drop-In Visits") {
+            updated.medicationRequired = false;
+            updated.medicationInstructions = "";
+          }
 
           if (updated.serviceName === "Pet Sitting & Overnight Care") {
-            updated.startTime = OVERNIGHT_START_TIME;
+            updated.startTime = FLEXIBLE_OVERNIGHT_START;
             updated.endDate = addDays(updated.startDate, 1);
             updated.endTime = OVERNIGHT_END_TIME;
           } else if (
@@ -432,6 +439,15 @@ const [today, setToday] = useState("");
           ) {
             updated.startTime = "09:00";
           }
+        }
+
+        if (
+          changes.serviceOption &&
+          updated.serviceName === "Pet Sitting & Overnight Care"
+        ) {
+          updated.startTime = updated.serviceOption === "Dedicated overnight"
+            ? DEDICATED_OVERNIGHT_START
+            : FLEXIBLE_OVERNIGHT_START;
         }
 
         if (
@@ -503,11 +519,10 @@ const [today, setToday] = useState("");
   const discountAmount =
     selectedPetCount >= 2 ? MULTI_PET_DISCOUNT : 0;
 
-  const medicationFee = services.some(
-    (service) => service.medicationRequired
-  )
-    ? MEDICATION_FEE
-    : 0;
+  const medicationFee = services.filter(
+    (service) =>
+      service.serviceName === "Drop-In Visits" && service.medicationRequired
+  ).length * MEDICATION_FEE;
 
   const total = Math.max(0, subtotal + medicationFee - discountAmount);
 
@@ -604,7 +619,7 @@ const [today, setToday] = useState("");
 
     if (hasInvalidOvernight) {
       setError(
-        "Please check your overnight dates and times. Check-in starts at 6:00 PM, and checkout must be by 7:00 AM."
+        "Please check your overnight dates and times. Flexible care starts at 8:00 PM; dedicated care starts at 10:00 PM. Both end at 7:00 AM."
       );
       return;
     }
@@ -686,13 +701,7 @@ const [today, setToday] = useState("");
 
       <div className="booking-shell">
         <header className="booking-header">
-          <a className="booking-brand" href="/">
-            <span className="booking-brand-mark" aria-hidden="true">🐾</span>
-            <span className="booking-brand-copy">
-              <strong>Paws in Motion</strong>
-              <small>Thoughtful care for your best friend</small>
-            </span>
-          </a>
+          <Brand className="brand booking-brand" />
 
           <a className="booking-back-link" href="/dashboard">
             <span aria-hidden="true">←</span> My dashboard
@@ -799,7 +808,9 @@ const [today, setToday] = useState("");
                       }
                     >
                       {SERVICE_OPTIONS[service.serviceName].map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>
+                          {option === "Flexible overnight" ? "Flexible overnight (8:00 PM–7:00 AM)" : option === "Dedicated overnight" ? "Dedicated overnight (10:00 PM–7:00 AM)" : option}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -854,9 +865,9 @@ const [today, setToday] = useState("");
                           })
                         }
                       >
-                        {OVERNIGHT_CHECKIN_OPTIONS.map((time) => (
-                          <option key={time} value={time}>{formatTimeLabel(time)}</option>
-                        ))}
+                        <option value={service.serviceOption === "Dedicated overnight" ? DEDICATED_OVERNIGHT_START : FLEXIBLE_OVERNIGHT_START}>
+                          {formatTimeLabel(service.startTime)}
+                        </option>
                       </select>
                     ) : service.serviceName === "Drop-In Visits" ? (
                       <select
@@ -887,8 +898,12 @@ const [today, setToday] = useState("");
 
                     {isOvernightService(service) && (
                       <small>
-                        Check-in is available from 6:00 PM to 11:30 PM.
-                        For earlier care, request a separate Drop-In Visit.
+                        Flexible overnight begins at 8:00 PM, after other
+                        appointments, and ends at 7:00 AM. Dedicated overnight
+                        runs 10:00 PM–7:00 AM without other pet appointments.
+                        A two-hour extension until 9:00 AM is $20 and must be
+                        requested in the instructions below. For earlier care,
+                        request a separate Drop-In Visit.
                       </small>
                     )}
 
@@ -937,11 +952,14 @@ const [today, setToday] = useState("");
                             })
                           }
                         >
-                          {OVERNIGHT_CHECKOUT_OPTIONS.map((time) => (
-                            <option key={time} value={time}>{formatTimeLabel(time)}</option>
-                          ))}
+                          <option value={OVERNIGHT_END_TIME}>{formatTimeLabel(OVERNIGHT_END_TIME)}</option>
                         </select>
-                        <small>Checkout is available until 7:00 AM.</small>
+                        <small>
+                          Checkout is available until 7:00 AM. The optional
+                          flexible-care extension to 9:00 AM costs $20 and
+                          needs to be requested in your notes; it is not
+                          included in this estimate.
+                        </small>
                       </label>
                     </>
                   )}
@@ -953,51 +971,54 @@ const [today, setToday] = useState("");
                   </div>
                 )}
 
-                <div className="booking-medication-panel">
-                  <label className="booking-medication-toggle">
-                    <input
-                      type="checkbox"
-                      checked={service.medicationRequired}
-                      onChange={(event) =>
-                        updateService(service.id, {
-                          medicationRequired: event.target.checked,
-                          medicationInstructions: event.target.checked
-                            ? service.medicationInstructions
-                            : "",
-                        })
-                      }
-                    />
-                    <span>
-                      <strong>Medication administration needed</strong>
-                      <small>
-                        Adds a one-time $5 medication fee to the entire booking.
-                      </small>
-                    </span>
-                  </label>
+                {service.serviceName === "Drop-In Visits" && (
+                  <div className="booking-medication-panel">
+                    <label className="booking-medication-toggle">
+                      <input
+                        type="checkbox"
+                        checked={service.medicationRequired}
+                        onChange={(event) =>
+                          updateService(service.id, {
+                            medicationRequired: event.target.checked,
+                            medicationInstructions: event.target.checked
+                              ? service.medicationInstructions
+                              : "",
+                          })
+                        }
+                      />
+                      <span>
+                        <strong>Medication administration needed</strong>
+                        <small>
+                          Adds $5 to this drop-in visit. Enter the medication
+                          name, dose, timing, and instructions below.
+                        </small>
+                      </span>
+                    </label>
 
-                  {service.medicationRequired && (
-                    <>
-                      <div className="booking-medication-price">
-                        <span>Additional medication fee</span>
-                        <strong>+${MEDICATION_FEE.toFixed(2)}</strong>
-                      </div>
-                      <label className="booking-field">
-                        <span>Medication instructions (required)</span>
-                        <textarea
-                          value={service.medicationInstructions}
-                          onChange={(event) =>
-                            updateService(service.id, {
-                              medicationInstructions: event.target.value,
-                            })
-                          }
-                          placeholder="Medication name, prescribed dose, timing, and any special instructions…"
-                          rows={3}
-                          required
-                        />
-                      </label>
-                    </>
-                  )}
-                </div>
+                    {service.medicationRequired && (
+                      <>
+                        <div className="booking-medication-price">
+                          <span>Additional medication fee</span>
+                          <strong>+${MEDICATION_FEE.toFixed(2)}</strong>
+                        </div>
+                        <label className="booking-field">
+                          <span>Medication instructions (required)</span>
+                          <textarea
+                            value={service.medicationInstructions}
+                            onChange={(event) =>
+                              updateService(service.id, {
+                                medicationInstructions: event.target.value,
+                              })
+                            }
+                            placeholder="Medication name, prescribed dose, timing, and any special instructions…"
+                            rows={3}
+                            required
+                          />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <label className="booking-field booking-notes-field">
                   <span>Instructions for this service (optional)</span>
@@ -1006,7 +1027,7 @@ const [today, setToday] = useState("");
                     onChange={(event) =>
                       updateService(service.id, { notes: event.target.value })
                     }
-                    placeholder="For example: leash location, feeding routine, or access instructions…"
+                    placeholder="For example: leash location, feeding routine, access instructions, a morning extension, or a bathing/yard cleanup add-on request…"
                     rows={3}
                   />
                 </label>
@@ -1025,7 +1046,10 @@ const [today, setToday] = useState("");
                       getPrice(service) === null
                         ? null
                         : getPrice(service)! +
-                          (service.medicationRequired ? MEDICATION_FEE : 0)
+                          (service.serviceName === "Drop-In Visits" &&
+                          service.medicationRequired
+                            ? MEDICATION_FEE
+                            : 0)
                     )}
                   </strong>
                 </div>

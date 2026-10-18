@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import Brand from "@/components/Brand";
 
 type EmployeeProfile = {
   full_name: string | null;
@@ -89,17 +90,7 @@ export default function EmployeeDashboardPage() {
   return (
     <main style={styles.page}>
       <header style={styles.topbar}>
-        <button
-          type="button"
-          style={styles.brandButton}
-          onClick={() => router.push("/employee")}
-        >
-          <span style={styles.paw}>🐾</span>
-          <span>
-            <strong style={styles.brandName}>Paws in Motion</strong>
-            <span style={styles.brandSubtitle}>EMPLOYEE PORTAL</span>
-          </span>
-        </button>
+        <Brand className="brand" subtitle="EMPLOYEE PORTAL" />
 
         <div style={styles.topActions}>
           <span style={styles.employeeBadge}>

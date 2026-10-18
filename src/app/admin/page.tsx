@@ -4,13 +4,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import Brand from "@/components/Brand";
+import CompleteJobButton from "../employee/jobs/[id]/CompleteJobButton";
 
 type Booking = {
   id: string;
-  customer_id: string;
+  customer_id: string | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
   service_name: string | null;
   booking_date: string;
   status: string;
+  request_notes: string | null;
   assigned_employee_id: string | null;
   estimated_total: number | string | null;
 };
@@ -34,6 +40,8 @@ type BookingService = {
   service_name: string | null;
   service_start: string;
   service_end: string;
+  service_option: string | null;
+  service_notes: string | null;
 };
 
 export default function AdminPage() {
@@ -127,7 +135,7 @@ export default function AdminPage() {
         supabase
           .from("bookings")
           .select(
-            "id, customer_id, service_name, booking_date, status, assigned_employee_id, estimated_total"
+            "id, customer_id, guest_name, guest_email, guest_phone, service_name, booking_date, status, request_notes, assigned_employee_id, estimated_total"
           )
           .order("booking_date", { ascending: true }),
 
@@ -152,7 +160,7 @@ export default function AdminPage() {
 
         const { data: serviceRows, error: serviceError } = await supabase
           .from("booking_services")
-          .select("booking_id, service_name, service_start, service_end")
+          .select("booking_id, service_name, service_option, service_notes, service_start, service_end")
           .in("booking_id", bookingIds)
           .order("service_start", { ascending: true });
 
@@ -178,7 +186,7 @@ export default function AdminPage() {
 
       const customerIds = [
         ...new Set(bookingRows.map((booking) => booking.customer_id)),
-      ];
+      ].filter((id): id is string => Boolean(id));
 
       if (customerIds.length > 0) {
         const { data: customerRows, error: customerError } = await supabase
@@ -625,17 +633,7 @@ export default function AdminPage() {
   return (
     <main style={styles.page}>
       <header style={styles.topbar}>
-        <button
-          type="button"
-          style={styles.brandButton}
-          onClick={() => router.push("/admin")}
-        >
-          <span style={styles.paw}>🐾</span>
-          <span>
-            <strong style={styles.brandName}>Paws in Motion</strong>
-            <span style={styles.brandSubtitle}>ADMIN PORTAL</span>
-          </span>
-        </button>
+        <Brand className="brand" subtitle="ADMIN PORTAL" />
 
         <div style={styles.topActions}>
           <span style={styles.adminBadge}>Administrator</span>
@@ -918,7 +916,9 @@ export default function AdminPage() {
           ) : (
             <div style={styles.bookingGrid}>
               {bookings.map((booking) => {
-                const customer = customers[booking.customer_id];
+                const customer = booking.customer_id
+                  ? customers[booking.customer_id]
+                  : undefined;
                 const assignedEmployee = teamMembers.find(
                   (member) => member.id === booking.assigned_employee_id
                 );
@@ -936,9 +936,19 @@ export default function AdminPage() {
                         <p style={styles.detailText}>
                           Customer:{" "}
                           {customer?.full_name ||
+                            booking.guest_name ||
                             customer?.email ||
+                            booking.guest_email ||
                             "Customer"}
                         </p>
+                        {(booking.guest_email || customer?.email) && (
+                          <p style={styles.detailText}>
+                            Email: {customer?.email || booking.guest_email}
+                          </p>
+                        )}
+                        {booking.guest_phone && (
+                          <p style={styles.detailText}>Phone: {booking.guest_phone}</p>
+                        )}
                       </div>
 
                       <span
@@ -968,6 +978,7 @@ export default function AdminPage() {
                               {service.service_name ||
                                 booking.service_name ||
                                 "Pet care service"}
+                              {service.service_option ? ` · ${service.service_option}` : ""}
                               {" — "}
                               {new Date(service.service_start).toLocaleString(
                                 "en-US",
@@ -999,6 +1010,13 @@ export default function AdminPage() {
                           ? "Not available"
                           : `$${Number(booking.estimated_total).toFixed(2)}`}
                       </p>
+
+                      {booking.request_notes && (
+                        <p style={{ ...styles.detailText, whiteSpace: "pre-wrap" }}>
+                          <strong>Request details:</strong>{" "}
+                          {booking.request_notes}
+                        </p>
+                      )}
 
                       <p style={styles.detailText}>
                         <strong>Assigned team member:</strong>{" "}
@@ -1054,7 +1072,9 @@ export default function AdminPage() {
                         Booking status
                         <select
                           value={booking.status}
-                          disabled={savingId === booking.id || cancelled}
+                          disabled={
+                            savingId === booking.id || cancelled || completed
+                          }
                           onChange={(event) =>
                             void updateBooking(booking.id, {
                               status: event.target.value,
@@ -1064,10 +1084,19 @@ export default function AdminPage() {
                         >
                           <option value="pending">Pending</option>
                           <option value="approved">Approved</option>
-                          <option value="completed">Completed</option>
+                          {booking.status === "completed" && (
+                            <option value="completed">Completed</option>
+                          )}
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </label>
+
+                      {booking.status === "approved" && (
+                        <CompleteJobButton
+                          bookingId={booking.id}
+                          onCompleted={() => void loadData()}
+                        />
+                      )}
                     </div>
 
                     {savingId === booking.id && (

@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
+import Brand from "@/components/Brand";
 
 type Pet = {
   id: string;
@@ -625,9 +626,7 @@ export default function DashboardPage() {
   return (
     <main className="dashboard-page">
       <header className="dashboard-header">
-        <Link href="/" className="account-brand">
-          Paws in Motion
-        </Link>
+        <Brand className="account-brand" />
 
         <button
           type="button"

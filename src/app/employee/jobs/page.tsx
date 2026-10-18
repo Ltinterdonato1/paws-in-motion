@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Brand from "@/components/Brand";
 import { createClient } from "@/lib/supabase";
 
 type Job = {
@@ -137,9 +138,7 @@ export default function EmployeeJobsPage() {
         </Link>
 
         <header className="mb-8 mt-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#718477]">
-            Paws in Motion
-          </p>
+          <Brand className="brand" subtitle="EMPLOYEE PORTAL" />
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">My Jobs</h1>
           <p className="mt-3 text-[#5d6f63]">
             View assigned bookings and open a job for its details.

@@ -1,5 +1,6 @@
 
 import Link from "next/link";
+import Brand from "@/components/Brand";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
@@ -36,9 +37,7 @@ function JobLoading() {
   return (
     <main className="min-h-screen bg-[#f8f5ec] px-5 py-10 text-[#193d30] sm:px-8">
       <div className="mx-auto max-w-4xl rounded-2xl border border-[#e6e4d9] bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#718477]">
-          Paws in Motion
-        </p>
+        <Brand className="brand" subtitle="EMPLOYEE PORTAL" />
         <h1 className="mt-3 text-3xl font-bold">Loading job details...</h1>
         <p className="mt-2 text-sm text-[#5d6f63]">
           Please wait while we retrieve the job information.
@@ -67,7 +66,7 @@ async function EmployeeJobContent({
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
     .select(
-      "id, customer_id, assigned_employee_id, service_name, booking_date, status, request_notes, estimated_subtotal, medication_fee, discount_amount, estimated_total"
+      "id, customer_id, guest_name, guest_email, guest_phone, assigned_employee_id, service_name, booking_date, status, request_notes, estimated_subtotal, medication_fee, discount_amount, estimated_total"
     )
     .eq("id", id)
     .maybeSingle();
@@ -137,9 +136,7 @@ async function EmployeeJobContent({
         </Link>
 
         <header className="mb-8 mt-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#718477]">
-            Paws in Motion
-          </p>
+          <Brand className="brand" subtitle="EMPLOYEE PORTAL" />
 
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
             Job Details
@@ -175,6 +172,14 @@ async function EmployeeJobContent({
                 ? dateTime(services[0].service_start)
                 : dateTime(booking.booking_date)}
             </p>
+
+            {(booking.guest_name || booking.guest_email || booking.guest_phone) && (
+              <div className="mt-3 text-sm text-[#5d6f63]">
+                <p><strong>Customer:</strong> {booking.guest_name || "Customer"}</p>
+                {booking.guest_email && <p><strong>Email:</strong> {booking.guest_email}</p>}
+                {booking.guest_phone && <p><strong>Phone:</strong> {booking.guest_phone}</p>}
+              </div>
+            )}
 
             {booking.request_notes && (
               <div className="mt-4">

@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Guest booking requests and reminders
+
+Apply `supabase/migrations/202610180001_guest_bookings_and_reminders.sql` to the Supabase project before deploying. Guest requests are saved as pending bookings; admins approve them from the admin page. A Netlify scheduled function checks approved bookings every five minutes and sends the selected 24-hour and 2-hour reminders. Completing a job creates and emails the invoice; customers who opted into texts also receive a completion update.
+
+Configure these environment variables in Netlify for scheduled delivery:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+
+Scheduled reminders run on published Netlify deploys. The email and Twilio settings must also be available to the Next.js server for invoice and completion messages.

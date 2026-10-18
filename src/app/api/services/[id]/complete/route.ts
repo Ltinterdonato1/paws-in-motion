@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { sendEmail } from "@/lib/emails";
+import { sendSms } from "@/lib/sms";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,6 +13,7 @@ type ServiceItem = {
   service_name: string;
   service_option: string;
   price: number;
+  pet_name: string | null;
 };
 
 function money(amount: number) {
@@ -69,7 +71,7 @@ export async function POST(
     const { data: booking, error: bookingError } = await admin
       .from("bookings")
       .select(
-        "id, customer_id, assigned_employee_id, service_name, status, estimated_subtotal, medication_fee, discount_amount, estimated_total"
+        "id, customer_id, guest_name, guest_email, guest_phone, notification_preference, sms_consent, assigned_employee_id, service_name, status, estimated_subtotal, medication_fee, discount_amount, estimated_total"
       )
       .eq("id", bookingId)
       .maybeSingle();
@@ -120,7 +122,7 @@ export async function POST(
     // 4. Load the stored service prices for the invoice.
     const { data: services, error: servicesError } = await admin
       .from("booking_services")
-      .select("service_name, service_option, price")
+      .select("service_name, service_option, price, pet_name")
       .eq("booking_id", booking.id)
       .order("service_start", { ascending: true });
 
@@ -202,16 +204,19 @@ export async function POST(
     }
 
     // 5. Load the customer email address.
-    const { data: customer, error: customerError } = await admin
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", booking.customer_id)
-      .maybeSingle();
+    const { data: customer, error: customerError } = booking.customer_id
+      ? await admin
+          .from("profiles")
+          .select("email, full_name, phone")
+          .eq("id", booking.customer_id)
+          .maybeSingle()
+      : { data: null, error: null };
+    const customerEmail = customer?.email?.trim() || booking.guest_email?.trim();
+    const customerPhone = customer?.phone?.trim() || booking.guest_phone?.trim();
 
     if (
       customerError ||
-      !customer?.email ||
-      !customer.email.trim()
+      !customerEmail
     ) {
       return NextResponse.json(
         {
@@ -300,7 +305,7 @@ export async function POST(
     }
 
     // 8. Email the invoice summary to the customer.
-    const customerName = customer.full_name?.trim() || "Customer";
+    const customerName = customer?.full_name?.trim() || booking.guest_name?.trim() || "Customer";
     const serviceDescriptions = lineItems
       .map(
         (item) =>
@@ -309,7 +314,7 @@ export async function POST(
       .join("\n");
 
     const emailResult = await sendEmail({
-      to: customer.email,
+      to: customerEmail,
       subject: `Your Paws in Motion invoice ${invoice.invoice_number}`,
       text: [
         `Hello ${customerName},`,
@@ -331,6 +336,23 @@ export async function POST(
         "Thank you for choosing Paws in Motion!",
       ].join("\n"),
     });
+
+    let smsSent = false;
+    if (
+      booking.sms_consent &&
+      customerPhone &&
+      ["text", "both"].includes(booking.notification_preference)
+    ) {
+      const petName = serviceItems.find((item) => item.pet_name)?.pet_name || "your pet";
+      const smsResult = await sendSms(
+        customerPhone,
+        `Hey! Thank you for letting us take care of ${petName} today. Have a great day—it was a pleasure watching them. — Paws in Motion`
+      );
+      smsSent = smsResult.success;
+      if (!smsResult.success) {
+        console.error("Completion text could not be sent:", smsResult.error);
+      }
+    }
 
     if (emailResult.success) {
       await admin
@@ -356,6 +378,7 @@ export async function POST(
       invoiceNumber: invoice.invoice_number,
       totalAmount: invoice.total_amount,
       emailSent: emailResult.success,
+      smsSent,
       message: emailResult.success
         ? "Job completed, invoice created, and customer email sent."
         : "Job completed and invoice created, but the email could not be sent. Check the server email settings and invoice record.",

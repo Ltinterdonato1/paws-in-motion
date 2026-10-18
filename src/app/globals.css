@@ -239,7 +239,7 @@ main {
 }
 
 .section-pad {
-  padding: 105px max(7.5%, calc((100vw - 1320px) / 2));
+  padding: 72px max(7.5%, calc((100vw - 1320px) / 2));
 }
 
 .section-label {
@@ -453,10 +453,10 @@ p {
 .hero {
   position: relative;
   display: grid;
-  min-height: 640px;
+  min-height: 570px;
   grid-template-columns: 0.93fr 1.07fr;
   align-items: stretch;
-  padding: 65px 7.5% 77px;
+  padding: 42px 7.5% 66px;
   background: var(--cream);
 }
 
@@ -535,7 +535,7 @@ p {
 
 .hero-photo {
   position: relative;
-  min-height: 480px;
+  min-height: 420px;
   overflow: hidden;
   background-color: #b7c0a7;
   background-image: url("https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1400&q=90");
@@ -708,7 +708,7 @@ p {
 
 .service-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 24px;
 }
@@ -717,8 +717,11 @@ p {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  overflow: hidden;
   background: var(--white);
-  border: 1px solid rgba(25, 61, 48, 0.07);
+  border: 1px solid rgba(25, 61, 48, 0.16);
+  border-radius: 24px;
+  box-shadow: 0 8px 24px rgba(25, 61, 48, 0.06);
   transition:
     transform 220ms ease,
     box-shadow 220ms ease;
@@ -733,11 +736,29 @@ p {
   position: relative;
   display: block;
   height: 225px;
+  box-sizing: border-box;
+  padding: 0;
   flex-shrink: 0;
   overflow: hidden;
   background-color: #e6e2d6;
   background-position: center;
-  background-size: cover;
+}
+
+.service-photo-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  background: #e6e2d6;
+}
+
+.services .service-grid > .service-card {
+  overflow: hidden;
+  border-radius: 24px;
 }
 
 .service-photo::after {
@@ -862,17 +883,38 @@ p {
 /* ===== ADDITIONAL PRICING DETAILS ===== */
 
 .pricing-note {
-  margin-top: 35px;
-  padding: 27px 30px;
+  margin-top: 24px;
+  padding: 18px 24px;
   border-left: 3px solid var(--orange);
   background: #eeeadf;
 }
 
 .pricing-note-heading {
-  margin-bottom: 18px;
+  margin-bottom: 0;
   color: var(--green);
   font-family: "Playfair Display", Georgia, serif;
-  font-size: 22px;
+  font-size: 19px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pricing-note-heading::-webkit-details-marker {
+  display: none;
+}
+
+.pricing-note-heading::after {
+  content: "+";
+  float: right;
+  font-family: Arial, sans-serif;
+  font-size: 20px;
+}
+
+.pricing-note[open] .pricing-note-heading::after {
+  content: "−";
+}
+
+.pricing-note-content {
+  padding-top: 17px;
 }
 
 .pricing-note p {
@@ -883,12 +925,88 @@ p {
 }
 
 .pricing-note p:last-of-type {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .pricing-note strong {
   color: var(--green);
   font-weight: 700;
+}
+
+.account-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 19px max(7.5%, calc((100vw - 1320px) / 2));
+  background: var(--cream-dark);
+}
+
+.account-strip p {
+  margin: 0;
+  color: #687267;
+  font-size: 12px;
+}
+
+.account-strip > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.account-strip a {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.services.section-pad {
+  padding-top: 76px;
+  padding-bottom: 76px;
+}
+
+.section-heading {
+  margin-bottom: 26px;
+}
+
+.section-heading h2 {
+  font-size: clamp(36px, 4vw, 54px);
+}
+
+.service-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.service-photo {
+  height: 165px;
+}
+
+.service-card-content {
+  padding: 18px 18px 16px;
+}
+
+.service-card h3 {
+  margin-bottom: 7px;
+  font-size: 21px;
+}
+
+.service-card-content > p {
+  margin-bottom: 10px;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.service-prices {
+  margin-bottom: 13px;
+  padding: 8px 0;
+}
+
+.service-price {
+  padding: 4px 0;
+  font-size: 10px;
 }
 
 /* ===== OUR APPROACH / VALUES ===== */
@@ -1439,6 +1557,11 @@ p {
     gap: 15px;
   }
 
+  .account-strip {
+    padding-right: 6%;
+    padding-left: 6%;
+  }
+
   .section-heading > p {
     max-width: 470px;
   }
@@ -1505,7 +1628,7 @@ p {
   }
 
   .section-pad {
-    padding: 72px 6%;
+    padding: 52px 6%;
   }
 
   .site-header {
@@ -1534,8 +1657,8 @@ p {
 
   .hero {
     grid-template-columns: 1fr;
-    gap: 30px;
-    padding: 45px 6% 70px;
+    gap: 20px;
+    padding: 34px 6% 65px;
   }
 
   .hero-content {
@@ -1568,7 +1691,7 @@ p {
   }
 
   .hero-photo {
-    min-height: 390px;
+    min-height: 290px;
   }
 
   .hero-photo-caption {
@@ -1605,6 +1728,22 @@ p {
     gap: 24px;
   }
 
+  .account-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 17px 6%;
+  }
+
+  .account-strip > div {
+    gap: 16px;
+  }
+
+  .services.section-pad {
+    padding-top: 52px;
+    padding-bottom: 52px;
+  }
+
   .intro-copy {
     max-width: 100%;
   }
@@ -1623,32 +1762,40 @@ p {
 
   .service-grid {
     grid-template-columns: 1fr;
-    gap: 23px;
+    gap: 15px;
   }
 
   .service-photo {
-    height: 250px;
+    height: 190px;
   }
 
   .service-card-content {
-    padding: 23px;
+    padding: 16px;
   }
 
   .service-card h3 {
-    font-size: 24px;
+    margin-bottom: 6px;
+    font-size: 21px;
   }
 
   .service-card-content > p {
-    font-size: 12px;
+    display: -webkit-box;
+    overflow: hidden;
+    margin-bottom: 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 
   .service-price {
-    font-size: 12px;
+    padding: 3px 0;
+    font-size: 11px;
   }
 
   .pricing-note {
-    margin-top: 25px;
-    padding: 20px;
+    margin-top: 18px;
+    padding: 16px;
   }
 
   .pricing-note-heading {
@@ -1849,13 +1996,19 @@ p {
 }
 
 .account-brand {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 30px;
   color: var(--green, #244c3a);
   font-family: "Playfair Display", Georgia, serif;
   font-size: 26px;
   font-weight: 700;
   text-decoration: none;
+}
+
+.account-brand .brand-name {
+  font-weight: 500;
 }
 
 .account-eyebrow {
@@ -1963,6 +2116,127 @@ p {
   text-underline-offset: 3px;
 }
 
+.booking-request-page {
+  align-items: flex-start;
+}
+
+.booking-request-card {
+  max-width: 850px;
+}
+
+.request-section-title {
+  grid-column: 1 / -1;
+  margin: 24px 0 2px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--green);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.request-fields-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.request-fields-two label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-form select,
+.account-form textarea,
+.account-form input[type="date"],
+.account-form input[type="time"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid #d9ded5;
+  border-radius: 10px;
+  background: #fff;
+  color: #24382c;
+  font: inherit;
+  font-size: 14px;
+}
+
+.account-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.account-form .request-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.request-check input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--green);
+}
+
+.request-hint {
+  margin: 0;
+  color: #687267;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.request-estimate {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 15px 16px;
+  border: 1px solid #d9ded5;
+  border-radius: 12px;
+  background: #f7f6ef;
+}
+
+.request-reference {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7f6ef;
+  color: var(--green);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.request-estimate span {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.request-estimate strong {
+  color: var(--green);
+  font-size: 15px;
+}
+
+.request-estimate small {
+  grid-column: 1 / -1;
+}
+
+.account-form small {
+  color: #687267;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.account-form small a {
+  color: var(--green);
+  font-weight: 700;
+}
+
 .account-home-link {
   display: block;
   width: fit-content;
@@ -1978,6 +2252,14 @@ p {
   .account-card {
     padding: 28px 22px;
     border-radius: 18px;
+  }
+
+  .request-fields-two {
+    grid-template-columns: 1fr;
+  }
+
+  .request-section-title {
+    font-size: 21px;
   }
 }
 .booking-page {

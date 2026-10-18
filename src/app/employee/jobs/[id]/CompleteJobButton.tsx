@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 
 type CompleteJobButtonProps = {
   bookingId: string;
+  onCompleted?: () => void;
 };
 
 export default function CompleteJobButton({
   bookingId,
+  onCompleted,
 }: CompleteJobButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -53,7 +55,11 @@ export default function CompleteJobButton({
       );
 
       // Reload the server-rendered booking details and its new status.
-      router.refresh();
+      if (onCompleted) {
+        onCompleted();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       setIsError(true);
       setMessage(

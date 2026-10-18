@@ -193,6 +193,35 @@ export async function PATCH(request: NextRequest) {
       return errorResponse("A team member ID is required.");
     }
 
+    // Handle resetting password for any team member (employee or admin)
+    if (body.action === "reset-password") {
+      const newPassword = String(body.newPassword ?? "");
+
+      if (
+        newPassword.length < 8 ||
+        newPassword.length > 128
+      ) {
+        return errorResponse(
+          "The new password must be between 8 and 128 characters."
+        );
+      }
+
+      const { error: passUpdateError } =
+        await auth.adminClient.auth.admin.updateUserById(employeeId, {
+          password: newPassword,
+        });
+
+      if (passUpdateError) {
+        return errorResponse(
+          `Unable to update the password: ${passUpdateError.message}`
+        );
+      }
+
+      return NextResponse.json({
+        message: "Password reset successfully.",
+      });
+    }
+
     if (body.action === "promote") {
       const { data, error } = await auth.adminClient
         .from("profiles")
