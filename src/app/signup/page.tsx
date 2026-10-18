@@ -165,7 +165,7 @@ export default function SignUpPage() {
         </p>
 
         <Link href="/" className="account-home-link">
-          ← Back to home
+          Back to home
         </Link>
       </section>
     </main>

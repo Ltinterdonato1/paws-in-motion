@@ -186,13 +186,7 @@ export default function Home() {
             Services & Pricing
           </a>
 
-          <a href="#about" onClick={closeMenu}>
-            Our Approach
-          </a>
-
-          <a href="#reviews" onClick={closeMenu}>
-            Happy Tails
-          </a>
+          
 
           <a href="/login" onClick={closeMenu}>
             Sign In
@@ -230,7 +224,11 @@ export default function Home() {
           </p>
 
           <div className="hero-actions">
-            <a className="button button-green" href="#services">
+            <a 
+              className="button button-green" 
+              href="#services"
+              style={{ borderRadius: '9999px' }}
+            >
               Explore services & pricing 
             </a>
           </div>
@@ -247,13 +245,7 @@ export default function Home() {
         >
           <div className="hero-photo-shade" />
 
-          <div className="photo-note">
-            <span className="photo-note-icon">♡</span>
-            <div>
-              <strong>HAPPY PAWS</strong>
-              <small>HAPPIER DAYS</small>
-            </div>
-          </div>
+          
 
           <div className="hero-photo-caption">
             A little fresh air goes a long way.
@@ -264,10 +256,10 @@ export default function Home() {
           <span className="hero-bottom-location">
             SEATTLE, WASHINGTON
           </span>
-          <a href="#services">GOOD CARE STARTS HERE</a>
         </div>
       </section>
 
+      {/* CUSTOMER ACCOUNT PROMPT */}
       {/* CUSTOMER ACCOUNT PROMPT */}
       <section className="intro section-pad">
         <div className="section-label">
@@ -288,20 +280,30 @@ export default function Home() {
               in one convenient place.
             </p>
 
-            <a className="underlined-link" href={SIGNUP_FOR_BOOKING}>
-              Create your account <span>↗</span>
-            </a>
-
-            <p>
-              Already have an account?{" "}
-              <a className="underlined-link" href="/login">
-                Sign in here <span>↗</span>
+            <div className="intro-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'flex-start', marginTop: '1.5rem' }}>
+              <a 
+                className="button button-green" 
+                href={SIGNUP_FOR_BOOKING}
+                style={{ borderRadius: '9999px' }}
+              >
+                Create your account 
               </a>
-            </p>
 
-            <a className="underlined-link" href="/dashboard">
-              Manage your appointments <span>↗</span>
-            </a>
+              <a 
+                className="button button-green" 
+                href={LOGIN_FOR_BOOKING}
+                style={{ borderRadius: '9999px' }}
+              >
+                Manage your appointments 
+              </a>
+
+              <p className="signin-text" style={{ margin: '0.25rem 0 0 0' }}>
+                Already have an account?{" "}
+                <a className="underlined-link" href="/login">
+                  Sign in here 
+                </a>
+              </p>
+            </div>
           </div>
         </div>
 
