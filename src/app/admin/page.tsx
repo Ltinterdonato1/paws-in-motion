@@ -35,15 +35,19 @@ type BookingService = {
   service_start: string;
   service_end: string;
 };
+
 export default function AdminPage() {
   const router = useRouter();
-  const [supabase] = useState(() => createClient());
+
+  const [supabase, setSupabase] = useState<
+    ReturnType<typeof createClient> | null
+  >(null);
 
   const [adminProfile, setAdminProfile] = useState<Profile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bookingServices, setBookingServices] = useState<
-  Record<string, BookingService[]>
->({});
+    Record<string, BookingService[]>
+  >({});
   const [employees, setEmployees] = useState<Profile[]>([]);
   const [administrators, setAdministrators] = useState<Profile[]>([]);
   const [customers, setCustomers] = useState<Record<string, Profile>>({});
@@ -69,8 +73,28 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  // Create the Supabase browser client after the component mounts.
+  // This prevents Next.js from trying to create it while prerendering /admin.
+  useEffect(() => {
+    try {
+      setSupabase(createClient());
+    } catch (error) {
+      setIsError(true);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to initialize Supabase. Check your environment variables."
+      );
+      setLoading(false);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
+    if (!supabase) return;
+
     setLoading(true);
+    setMessage("");
+    setIsError(false);
 
     try {
       const {
@@ -118,39 +142,39 @@ export default function AdminPage() {
       if (teamResult.error) throw teamResult.error;
 
       const bookingRows = (bookingResult.data ?? []) as Booking[];
-const teamRows = (teamResult.data ?? []) as Profile[];
+      const teamRows = (teamResult.data ?? []) as Profile[];
 
-setBookings(bookingRows);
+      setBookings(bookingRows);
 
-// Fetch the actual appointment times for these bookings.
-if (bookingRows.length > 0) {
-  const bookingIds = bookingRows.map((booking) => booking.id);
+      // Fetch the actual appointment times for each booking.
+      if (bookingRows.length > 0) {
+        const bookingIds = bookingRows.map((booking) => booking.id);
 
-  const { data: serviceRows, error: serviceError } = await supabase
-    .from("booking_services")
-    .select("booking_id, service_name, service_start, service_end")
-    .in("booking_id", bookingIds)
-    .order("service_start", { ascending: true });
+        const { data: serviceRows, error: serviceError } = await supabase
+          .from("booking_services")
+          .select("booking_id, service_name, service_start, service_end")
+          .in("booking_id", bookingIds)
+          .order("service_start", { ascending: true });
 
-  if (serviceError) throw serviceError;
+        if (serviceError) throw serviceError;
 
-  const servicesByBooking: Record<string, BookingService[]> = {};
+        const servicesByBooking: Record<string, BookingService[]> = {};
 
-  for (const service of (serviceRows ?? []) as BookingService[]) {
-    if (!servicesByBooking[service.booking_id]) {
-      servicesByBooking[service.booking_id] = [];
-    }
+        for (const service of (serviceRows ?? []) as BookingService[]) {
+          if (!servicesByBooking[service.booking_id]) {
+            servicesByBooking[service.booking_id] = [];
+          }
 
-    servicesByBooking[service.booking_id].push(service);
-  }
+          servicesByBooking[service.booking_id].push(service);
+        }
 
-  setBookingServices(servicesByBooking);
-} else {
-  setBookingServices({});
-}
+        setBookingServices(servicesByBooking);
+      } else {
+        setBookingServices({});
+      }
 
-setEmployees(teamRows.filter((member) => member.role === "employee"));
-setAdministrators(teamRows.filter((member) => member.role === "admin"));
+      setEmployees(teamRows.filter((member) => member.role === "employee"));
+      setAdministrators(teamRows.filter((member) => member.role === "admin"));
 
       const customerIds = [
         ...new Set(bookingRows.map((booking) => booking.customer_id)),
@@ -187,13 +211,19 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
   }, [router, supabase]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    if (supabase) {
+      void loadData();
+    }
+  }, [supabase, loadData]);
 
   async function callEmployeeApi(
     method: "POST" | "PATCH" | "DELETE",
     body: Record<string, string>
   ) {
+    if (!supabase) {
+      throw new Error("Supabase is still initializing. Please try again.");
+    }
+
     const {
       data: { session },
       error: sessionError,
@@ -342,10 +372,7 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
     }
   }
 
-  async function deleteTeamMember(
-    member: Profile,
-    isEmployee: boolean
-  ) {
+  async function deleteTeamMember(member: Profile, isEmployee: boolean) {
     const name = member.full_name || member.email || "this team member";
     const accountType = isEmployee ? "employee" : "administrator";
 
@@ -388,6 +415,12 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
       assigned_employee_id?: string | null;
     }
   ) {
+    if (!supabase) {
+      setIsError(true);
+      setMessage("Supabase is still initializing. Please try again.");
+      return;
+    }
+
     setSavingId(bookingId);
     setMessage("");
     setIsError(false);
@@ -415,6 +448,11 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
   }
 
   async function handleLogout() {
+    if (!supabase) {
+      router.replace("/login");
+      return;
+    }
+
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();
@@ -612,7 +650,6 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
       </header>
 
       <div style={styles.content}>
-        {/* Welcome banner and signed-in administrator */}
         <section style={styles.welcome}>
           <div style={styles.welcomeContent}>
             <p style={styles.eyebrow}>YOUR WORKSPACE</p>
@@ -640,7 +677,7 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
               <div style={styles.accountDetails}>
                 <p style={styles.accountEyebrow}>SIGNED-IN ACCOUNT</p>
                 <h2 style={styles.profileName}>
-                 
+                  {adminProfile?.full_name || "Administrator"}
                 </h2>
                 <p style={styles.profileDetail}>
                   {adminProfile?.email || "No email available"}
@@ -653,8 +690,6 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
               <span style={styles.accountRole}>Administrator</span>
             </div>
           </div>
-
-          
         </section>
 
         {message && (
@@ -675,7 +710,6 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
           </section>
         )}
 
-        {/* Booking statistics */}
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <div>
@@ -723,7 +757,6 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
           </div>
         </section>
 
-        {/* Team management */}
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <div>
@@ -872,7 +905,6 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
           </div>
         </section>
 
-        {/* Booking management */}
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <div>
@@ -928,30 +960,38 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
                       <p style={styles.detailText}>
                         <strong>Appointment time:</strong>
                         {bookingServices[booking.id]?.length ? (
-                            bookingServices[booking.id].map((service, index) => (
+                          bookingServices[booking.id].map((service, index) => (
                             <span
-                                key={`${booking.id}-${service.service_start}-${index}`}
-                                style={{ display: "block", marginTop: 6 }}
+                              key={`${booking.id}-${service.service_start}-${index}`}
+                              style={{ display: "block", marginTop: 6 }}
                             >
-                                {service.service_name || booking.service_name || "Pet care service"}
-                                {" — "}
-                                {new Date(service.service_start).toLocaleString("en-US", {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                                timeZone: "America/Los_Angeles",
-                                })}
-                                {" – "}
-                                {new Date(service.service_end).toLocaleTimeString("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                timeZone: "America/Los_Angeles",
-                                })}
+                              {service.service_name ||
+                                booking.service_name ||
+                                "Pet care service"}
+                              {" — "}
+                              {new Date(service.service_start).toLocaleString(
+                                "en-US",
+                                {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                  timeZone: "America/Los_Angeles",
+                                }
+                              )}
+                              {" – "}
+                              {new Date(service.service_end).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  timeZone: "America/Los_Angeles",
+                                }
+                              )}
                             </span>
-                            ))
+                          ))
                         ) : (
-                            " Time unavailable"
+                          " Time unavailable"
                         )}
-                        </p>
+                      </p>
 
                       <p style={styles.detailText}>
                         <strong>Estimated total:</strong>{" "}
@@ -975,37 +1015,39 @@ setAdministrators(teamRows.filter((member) => member.role === "admin"));
                       <label>
                         Assign employee
                         <select
-  value={booking.assigned_employee_id || ""}
-  onChange={(event) =>
-    void updateBooking(booking.id, {
-      assigned_employee_id: event.target.value || null,
-    })
-  }
-  disabled={
-    savingId === booking.id ||
-    booking.status === "cancelled" ||
-    booking.status === "completed"
-  }
-  style={styles.input}
->
-  <option value="">Unassigned</option>
+                          value={booking.assigned_employee_id || ""}
+                          onChange={(event) =>
+                            void updateBooking(booking.id, {
+                              assigned_employee_id: event.target.value || null,
+                            })
+                          }
+                          disabled={
+                            savingId === booking.id ||
+                            cancelled ||
+                            completed
+                          }
+                          style={styles.input}
+                        >
+                          <option value="">Unassigned</option>
 
-  <optgroup label="Employees">
-    {employees.map((employee) => (
-      <option key={employee.id} value={employee.id}>
-        {employee.full_name || employee.email || employee.id}
-      </option>
-    ))}
-  </optgroup>
+                          <optgroup label="Employees">
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.full_name ||
+                                  employee.email ||
+                                  employee.id}
+                              </option>
+                            ))}
+                          </optgroup>
 
-  <optgroup label="Administrators">
-    {administrators.map((admin) => (
-      <option key={admin.id} value={admin.id}>
-        {admin.full_name || admin.email || admin.id}
-      </option>
-    ))}
-  </optgroup>
-</select>
+                          <optgroup label="Administrators">
+                            {administrators.map((admin) => (
+                              <option key={admin.id} value={admin.id}>
+                                {admin.full_name || admin.email || admin.id}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </select>
                       </label>
 
                       <label>
@@ -1230,7 +1272,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 700,
   },
-  welcomePaw: { fontSize: 64, flexShrink: 0 },
   section: { marginTop: 34 },
   sectionHeader: {
     display: "flex",
@@ -1363,14 +1404,6 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 18,
     paddingTop: 16,
     borderTop: "1px solid #edf0ed",
-  },
-  statusBadge: {
-    display: "inline-block",
-    padding: "7px 11px",
-    borderRadius: 20,
-    fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: 0.4,
   },
   pendingBadge: {
     display: "inline-block",
