@@ -1,6 +1,7 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import CompleteJobButton from "./CompleteJobButton";
@@ -21,7 +22,33 @@ type BookingService = {
   medication_instructions: string | null;
 };
 
-export default async function EmployeeJobPage({
+export default function EmployeeJobPage({
+  params,
+}: EmployeeJobPageProps) {
+  return (
+    <Suspense fallback={<JobLoading />}>
+      <EmployeeJobContent params={params} />
+    </Suspense>
+  );
+}
+
+function JobLoading() {
+  return (
+    <main className="min-h-screen bg-[#f8f5ec] px-5 py-10 text-[#193d30] sm:px-8">
+      <div className="mx-auto max-w-4xl rounded-2xl border border-[#e6e4d9] bg-white p-8 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#718477]">
+          Paws in Motion
+        </p>
+        <h1 className="mt-3 text-3xl font-bold">Loading job details...</h1>
+        <p className="mt-2 text-sm text-[#5d6f63]">
+          Please wait while we retrieve the job information.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+async function EmployeeJobContent({
   params,
 }: EmployeeJobPageProps) {
   const { id } = await params;
@@ -113,9 +140,11 @@ export default async function EmployeeJobPage({
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#718477]">
             Paws in Motion
           </p>
+
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
             Job Details
           </h1>
+
           <p className="mt-2 break-all text-sm text-[#5d6f63]">
             Booking reference: {booking.id}
           </p>
@@ -139,11 +168,12 @@ export default async function EmployeeJobPage({
 
           <div className="mt-6 border-t border-[#eeeae0] pt-6">
             <h3 className="font-semibold">Booking Information</h3>
+
             <p className="mt-2 text-sm text-[#5d6f63]">
               <strong>Scheduled:</strong>{" "}
-{services && services.length > 0
-  ? dateTime(services[0].service_start)
-  : dateTime(booking.booking_date)}
+              {services && services.length > 0
+                ? dateTime(services[0].service_start)
+                : dateTime(booking.booking_date)}
             </p>
 
             {booking.request_notes && (
@@ -167,7 +197,10 @@ export default async function EmployeeJobPage({
           ) : (
             <div className="mt-4 divide-y divide-[#eeeae0]">
               {(services as BookingService[]).map((service) => (
-                <article key={service.id} className="py-5 first:pt-0 last:pb-0">
+                <article
+                  key={service.id}
+                  className="py-5 first:pt-0 last:pb-0"
+                >
                   <div className="flex flex-wrap justify-between gap-3">
                     <div>
                       <h3 className="font-semibold">
@@ -184,21 +217,26 @@ export default async function EmployeeJobPage({
                   </div>
 
                   <p className="mt-3 text-sm text-[#5d6f63]">
-                    <strong>Start:</strong> {dateTime(service.service_start)}
+                    <strong>Start:</strong>{" "}
+                    {dateTime(service.service_start)}
                   </p>
+
                   <p className="mt-1 text-sm text-[#5d6f63]">
-                    <strong>End:</strong> {dateTime(service.service_end)}
+                    <strong>End:</strong>{" "}
+                    {dateTime(service.service_end)}
                   </p>
 
                   {service.service_notes && (
                     <p className="mt-3 whitespace-pre-wrap text-sm text-[#5d6f63]">
-                      <strong>Service notes:</strong> {service.service_notes}
+                      <strong>Service notes:</strong>{" "}
+                      {service.service_notes}
                     </p>
                   )}
 
                   {service.medication_required && (
                     <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                       <strong>Medication required</strong>
+
                       {service.medication_instructions && (
                         <p className="mt-1 whitespace-pre-wrap">
                           {service.medication_instructions}
@@ -243,30 +281,32 @@ export default async function EmployeeJobPage({
         </section>
 
         <div className="mt-6">
-  {booking.status === "approved" ? (
-    <div className="rounded-xl border border-[#d8e3d7] bg-white p-5">
-      <h2 className="font-semibold">Ready for completion</h2>
+          {booking.status === "approved" ? (
+            <div className="rounded-xl border border-[#d8e3d7] bg-white p-5">
+              <h2 className="font-semibold">Ready for completion</h2>
 
-      <p className="mt-2 mb-4 text-sm text-[#5d6f63]">
-        Once the service has been performed, complete the job
-        below to create the customer invoice.
-      </p>
+              <p className="mb-4 mt-2 text-sm text-[#5d6f63]">
+                Once the service has been performed, complete the job
+                below to create the customer invoice.
+              </p>
 
-      <CompleteJobButton bookingId={booking.id} />
-    </div>
-  ) : booking.status === "completed" ? (
-    <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-green-900">
-      <h2 className="font-semibold">This job is completed</h2>
-      <p className="mt-2 text-sm">
-        The booking is marked as completed.
-      </p>
-    </div>
-  ) : (
-    <div className="rounded-xl bg-white p-5 text-sm text-[#5d6f63]">
-      Jobs must be approved before they can be completed.
-    </div>
-  )}
-</div>
+              <CompleteJobButton bookingId={booking.id} />
+            </div>
+          ) : booking.status === "completed" ? (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-green-900">
+              <h2 className="font-semibold">
+                This job is completed
+              </h2>
+              <p className="mt-2 text-sm">
+                The booking is marked as completed.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-white p-5 text-sm text-[#5d6f63]">
+              Jobs must be approved before they can be completed.
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

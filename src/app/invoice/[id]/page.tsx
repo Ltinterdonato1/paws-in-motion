@@ -1,13 +1,5 @@
 
-type InvoicePageProps = {
-  params: Promise<{ id: string }>;
-};
-
-export default async function InvoicePage({
-  params,
-}: InvoicePageProps) {
-  await params;
-
+export default function InvoicePage() {
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-10">
       <div className="mx-auto max-w-3xl rounded-xl bg-white p-8 shadow-sm">

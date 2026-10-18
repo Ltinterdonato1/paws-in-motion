@@ -349,7 +349,8 @@ export default function BookPage() {
   const router = useRouter();
 
   const [pets, setPets] = useState<Pet[]>([]);
-  const [services, setServices] = useState<ServiceDraft[]>([makeDraft()]);
+  const [services, setServices] = useState<ServiceDraft[]>([]);
+const [today, setToday] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -357,9 +358,13 @@ export default function BookPage() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    let active = true;
+  let active = true;
 
-    async function loadCustomerPets() {
+  const currentDate = new Date();
+  setToday(localDateString(currentDate));
+  setServices([makeDraft()]);
+
+  async function loadCustomerPets() {
       const supabase = createClient();
       const { data, error: authError } = await supabase.auth.getUser();
 
@@ -824,7 +829,7 @@ export default function BookPage() {
                     <input
                       type="date"
                       value={service.startDate}
-                      min={localDateString(new Date())}
+                      min={today}
                       required
                       onChange={(event) =>
                         updateService(service.id, {
@@ -911,7 +916,7 @@ export default function BookPage() {
                         <input
                           type="date"
                           value={service.endDate}
-                          min={service.startDate || localDateString(new Date())}
+                          min={service.startDate || today}
                           required
                           onChange={(event) =>
                             updateService(service.id, {
