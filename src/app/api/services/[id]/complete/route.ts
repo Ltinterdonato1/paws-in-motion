@@ -10,10 +10,12 @@ type RouteContext = {
 };
 
 type ServiceItem = {
+  id: string;
   service_name: string;
   service_option: string;
   price: number;
   pet_name: string | null;
+  completed_at: string | null;
 };
 
 function money(amount: number) {
@@ -24,10 +26,33 @@ function money(amount: number) {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: RouteContext
 ) {
   try {
+    let latePickupFee = 0;
+    let serviceItemId: string | null = null;
+    let reportLatePickup = false;
+    try {
+      const body = (await request.json()) as {
+        latePickupFee?: unknown;
+        serviceItemId?: unknown;
+        reportLatePickup?: unknown;
+      };
+      serviceItemId = typeof body.serviceItemId === "string" ? body.serviceItemId : null;
+      reportLatePickup = body.reportLatePickup === true;
+      if (body.latePickupFee === 10 || body.latePickupFee === 40 || body.latePickupFee === 55 || body.latePickupFee === 90) {
+        latePickupFee = body.latePickupFee;
+      } else if (body.latePickupFee !== undefined && body.latePickupFee !== 0) {
+        return NextResponse.json(
+          { success: false, message: "Choose a valid late-pickup or daytime boarding fee." },
+          { status: 400 }
+        );
+      }
+    } catch {
+      // Older callers without a JSON body complete the job without extra fees.
+    }
+
     // 1. Verify the signed-in user using their session.
     const sessionClient = await createClient();
     const {
@@ -71,7 +96,7 @@ export async function POST(
     const { data: booking, error: bookingError } = await admin
       .from("bookings")
       .select(
-        "id, customer_id, guest_name, guest_email, guest_phone, notification_preference, sms_consent, assigned_employee_id, service_name, status, estimated_subtotal, medication_fee, discount_amount, estimated_total"
+        "id, customer_id, guest_name, guest_email, guest_phone, notification_preference, sms_consent, assigned_employee_id, service_name, status, estimated_subtotal, medication_fee, vet_transport_fee, vet_transport_trips, discount_amount, estimated_total, late_pickup_review_required"
       )
       .eq("id", bookingId)
       .maybeSingle();
@@ -105,6 +130,69 @@ export async function POST(
       );
     }
 
+    if (reportLatePickup) {
+      if (booking.service_name !== "Doggy Day Care") {
+        return NextResponse.json(
+          { success: false, message: "Late-pickup review alerts only apply to day-care bookings." },
+          { status: 400 }
+        );
+      }
+      if (booking.status !== "approved") {
+        return NextResponse.json(
+          { success: false, message: "Only an active approved job can be flagged." },
+          { status: 409 }
+        );
+      }
+      if (booking.late_pickup_review_required) {
+        return NextResponse.json({
+          success: true,
+          message: "This late pickup is already flagged for admin review.",
+        });
+      }
+
+      const { error: alertError } = await admin
+        .from("bookings")
+        .update({
+          late_pickup_review_required: true,
+          late_pickup_reported_at: new Date().toISOString(),
+        })
+        .eq("id", booking.id);
+
+      if (alertError) {
+        console.error("Late-pickup review flag failed:", alertError.message);
+        return NextResponse.json(
+          { success: false, message: "The admin alert could not be saved." },
+          { status: 500 }
+        );
+      }
+
+      const notificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+      if (notificationEmail) {
+        const emailResult = await sendEmail({
+          to: notificationEmail,
+          subject: "Paws in Motion: Late pickup needs invoice review",
+          text: [
+            "An employee reported a late pickup that needs admin review before invoicing.",
+            "",
+            `Booking ID: ${booking.id}`,
+            `Service: ${booking.service_name || "Pet care service"}`,
+            `Customer: ${booking.guest_name || booking.guest_email || "Customer"}`,
+            "Open the admin dashboard to review the appropriate fee and create the invoice.",
+          ].join("\n"),
+        });
+        if (!emailResult.success) {
+          console.error("Late-pickup admin email failed:", emailResult.error);
+        }
+      } else {
+        console.error("Late-pickup alert saved, but ADMIN_NOTIFICATION_EMAIL is not configured.");
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Admin alerted. The booking is flagged for invoice review.",
+      });
+    }
+
     // Only approved bookings may be completed.
     if (booking.status !== "approved") {
       return NextResponse.json(
@@ -122,7 +210,7 @@ export async function POST(
     // 4. Load the stored service prices for the invoice.
     const { data: services, error: servicesError } = await admin
       .from("booking_services")
-      .select("service_name, service_option, price, pet_name")
+      .select("id, service_name, service_option, price, pet_name, completed_at")
       .eq("booking_id", booking.id)
       .order("service_start", { ascending: true });
 
@@ -137,7 +225,124 @@ export async function POST(
       );
     }
 
-    const serviceItems = (services ?? []) as ServiceItem[];
+    let serviceItems = (services ?? []) as ServiceItem[];
+
+    if (Number(booking.vet_transport_trips ?? 0) > 0) {
+      if (!serviceItemId) {
+        return NextResponse.json(
+          { success: false, message: "Complete each vet transportation leg separately before invoicing." },
+          { status: 400 }
+        );
+      }
+
+      const leg = serviceItems.find((item) => item.id === serviceItemId);
+      if (!leg || leg.service_name !== "Vet Transportation") {
+        return NextResponse.json(
+          { success: false, message: "Choose a scheduled vet transportation leg for completion." },
+          { status: 400 }
+        );
+      }
+
+      if (!leg.completed_at) {
+        const { data: markedLeg, error: markError } = await admin
+          .from("booking_services")
+          .update({ completed_at: new Date().toISOString(), completed_by: user.id })
+          .eq("id", serviceItemId)
+          .eq("booking_id", booking.id)
+          .is("completed_at", null)
+          .select("id")
+          .maybeSingle();
+
+        if (markError) {
+          console.error("Vet leg completion failed:", markError.message);
+          return NextResponse.json(
+            { success: false, message: "This transportation leg could not be marked complete." },
+            { status: 500 }
+          );
+        }
+        if (!markedLeg) {
+          return NextResponse.json(
+            { success: false, message: "This transportation leg was already completed. Refresh the job." },
+            { status: 409 }
+          );
+        }
+      }
+
+      const { data: remainingLegs, error: remainingError } = await admin
+        .from("booking_services")
+        .select("id")
+        .eq("booking_id", booking.id)
+        .eq("service_name", "Vet Transportation")
+        .is("completed_at", null);
+
+      if (remainingError) {
+        console.error("Vet leg status lookup failed:", remainingError.message);
+        return NextResponse.json(
+          { success: false, message: "Could not verify the remaining transportation legs." },
+          { status: 500 }
+        );
+      }
+
+      if ((remainingLegs ?? []).length > 0) {
+        return NextResponse.json({
+          success: true,
+          invoiceCreated: false,
+          message: "This vet trip is complete. The invoice will be created after the remaining trip is complete.",
+        });
+      }
+
+      await admin
+        .from("booking_services")
+        .update({ completed_at: new Date().toISOString(), completed_by: user.id })
+        .eq("booking_id", booking.id)
+        .neq("service_name", "Vet Transportation")
+        .is("completed_at", null);
+
+      const { data: refreshedServices, error: refreshedError } = await admin
+        .from("booking_services")
+        .select("id, service_name, service_option, price, pet_name, completed_at")
+        .eq("booking_id", booking.id)
+        .order("service_start", { ascending: true });
+      if (refreshedError) {
+        return NextResponse.json(
+          { success: false, message: "Could not reload service details for invoicing." },
+          { status: 500 }
+        );
+      }
+      serviceItems = (refreshedServices ?? []) as ServiceItem[];
+    }
+
+    const isDayCareBooking = serviceItems.some(
+      (item) => item.service_name === "Doggy Day Care"
+    );
+    const isBoardingBooking = serviceItems.some(
+      (item) => item.service_name === "Boarding"
+    );
+    if ([10, 40, 55].includes(latePickupFee) && !isDayCareBooking) {
+      return NextResponse.json(
+        { success: false, message: "The late-pickup fee only applies to day-care bookings." },
+        { status: 400 }
+      );
+    }
+    if (latePickupFee > 0 && profile.role !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Only an admin can add a reviewed late-pickup fee to the invoice." },
+        { status: 403 }
+      );
+    }
+    if (latePickupFee === 90 && !isBoardingBooking) {
+      return NextResponse.json(
+        { success: false, message: "The daytime boarding fee only applies to overnight boarding bookings." },
+        { status: 400 }
+      );
+    }
+
+    if (booking.late_pickup_review_required && profile.role !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "An admin must review the late-pickup fee before the invoice is sent." },
+        { status: 403 }
+      );
+    }
 
     if (serviceItems.some(
       (item) => !Number.isFinite(Number(item.price)) || Number(item.price) < 0
@@ -149,15 +354,19 @@ export async function POST(
     }
 
     const medicationFee = Number(booking.medication_fee ?? 0);
+    const vetTransportFee = Number(booking.vet_transport_fee ?? 0);
+    const vetTransportTrips = Number(booking.vet_transport_trips ?? 0);
     const discountAmount = Number(booking.discount_amount ?? 0);
     const estimatedSubtotal = Number(booking.estimated_subtotal ?? 0);
     const totalAmount = Number(booking.estimated_total ?? 0);
 
     if (
-      ![medicationFee, discountAmount, estimatedSubtotal, totalAmount].every(
+      ![medicationFee, vetTransportFee, vetTransportTrips, latePickupFee, discountAmount, estimatedSubtotal, totalAmount].every(
         Number.isFinite
       ) ||
       medicationFee < 0 ||
+      vetTransportFee < 0 ||
+      ![0, 1, 2].includes(vetTransportTrips) ||
       discountAmount < 0 ||
       estimatedSubtotal < 0 ||
       totalAmount < 0
@@ -168,7 +377,7 @@ export async function POST(
       );
     }
 
-    const lineItems = serviceItems.map((item) => ({
+    const lineItems = serviceItems.filter((item) => item.service_name !== "Vet Transportation").map((item) => ({
       description: `${item.service_name} — ${item.service_option}`,
       quantity: 1,
       unitPrice: Number(item.price),
@@ -182,13 +391,31 @@ export async function POST(
       });
     }
 
+    if (vetTransportFee > 0) {
+      lineItems.push({
+        description: `Vet transportation — ${vetTransportTrips === 1 ? "one way" : "drop off and return"}`,
+        quantity: 1,
+        unitPrice: vetTransportFee,
+      });
+    }
+
+    if (latePickupFee > 0) {
+      lineItems.push({
+        description: latePickupFee === 90
+          ? "Daytime boarding fee after overnight stay"
+          : latePickupFee === 10 ? "Day-care late-pickup fee" : "Day-care overnight boarding fee",
+        quantity: 1,
+        unitPrice: latePickupFee,
+      });
+    }
+
     // Use the saved booking totals. Do not recalculate historical prices
     // using potentially changed service prices.
     const invoiceSubtotal = Math.round(
-      (estimatedSubtotal + medicationFee) * 100
+      (estimatedSubtotal + medicationFee + latePickupFee) * 100
     ) / 100;
 
-    const invoiceTotal = Math.round(totalAmount * 100) / 100;
+    const invoiceTotal = Math.round((totalAmount + latePickupFee) * 100) / 100;
 
     if (invoiceTotal > invoiceSubtotal ||
         invoiceTotal < 0 ||
@@ -281,7 +508,11 @@ export async function POST(
     // This protects against two requests completing the same booking.
     const { data: completedBooking, error: completionError } = await admin
       .from("bookings")
-      .update({ status: "completed" })
+      .update({
+        status: "completed",
+        late_pickup_review_required: false,
+        ...(latePickupFee > 0 ? { estimated_total: invoiceTotal } : {}),
+      })
       .eq("id", booking.id)
       .eq("status", "approved")
       .select("id")
@@ -327,7 +558,7 @@ export async function POST(
         "Services:",
         serviceDescriptions || `- ${booking.service_name}`,
         "",
-        `Subtotal including medication fee: ${money(invoiceSubtotal)}`,
+        `Subtotal including medication and additional boarding or late-pickup fees: ${money(invoiceSubtotal)}`,
         `Discount: -${money(discountAmount)}`,
         `Total due: ${money(invoiceTotal)}`,
         "",

@@ -12,15 +12,21 @@ const SIGNUP_FOR_BOOKING = "/signup?next=%2Fbook";
 
 const services = [
   {
-    number: "01",
+    number: "03",
     id: "boarding",
-    title: "Boarding",
+    title: "Overnight Boarding",
     description:
-      "A cozy stay in an employee’s home. We’ll ask how your dog does around other pets and match them with a caregiver who fits.",
+      "A comfortable stay in a caregiver’s home. We’ll ask how your dog does around other pets and match them with a caregiver who fits.",
+    details: [
+      { label: "Drop-off:", value: "8:00 PM" },
+      { label: "Morning pickup:", value: "7:00–8:00 AM (includes a one-hour grace period)" },
+      { label: "After 8:00 AM:", value: "daytime boarding may be needed; we’ll confirm any extra charge with you" },
+    ],
     rates: [
       "Standard boarding — $40/night",
-      "Solo care, no other pets — $60/night",
+      "Solo care, no other pets — $55/night",
       "Pickup or drop-off — $20 each way",
+      "Second pet — 10% off · third pet — 15% off",
     ],
     image:
       "https://cdn.shopify.com/s/files/1/0268/7349/5624/files/Is_boarding_traumatic_for_your_dog.jpg?v=1740765074&width=1200&height=500&crop=center",
@@ -30,12 +36,38 @@ const services = [
     contactOnly: true,
   },
   {
-    number: "02",
-    id: "house-sitting",
-    title: "House Sitting",
+    number: "04",
+    id: "day-care",
+    title: "Day Care",
     description:
-      "Comforting care in your own home, keeping your pet close to familiar routines while you’re away.",
-    rates: ["Flexible overnight, 8 PM–7 AM — $80/night", "Dedicated overnight, 10 PM–7 AM — $100/night"],
+      "Daytime care in a caregiver’s home. Choose supervised group play with dogs who are a good fit, or one-on-one care for dogs who need individual attention. A dedicated day-and-night facility is a future goal.",
+    details: [
+      { label: "Care setting:", value: "caregiver’s home" },
+      { label: "Care hours:", value: "7:30 AM–6:00 PM" },
+      { label: "Drop-off:", value: "as early as 7:00 AM" },
+      { label: "Pickup:", value: "by 7:00 PM" },
+      { label: "Late pickup:", value: "$10 after 6:00 PM through 7:00 PM" },
+      { label: "After 7:00 PM without calling:", value: "$40 standard or $55 one-on-one overnight boarding fee" },
+    ],
+    rates: ["Group care with other dogs — $45/day", "One-on-one care — $90/day"],
+    image:
+      "https://images.unsplash.com/photo-1638766211645-505c1c678b2b?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "Dogs playing together during group day care",
+    href: "/booking-request?service=Doggy%20Day%20Care",
+    action: "Book day care",
+    contactOnly: false,
+  },
+  {
+    number: "05",
+    id: "house-sitting",
+    title: "Overnight House Sitting",
+    description:
+      "A caregiver stays in your home overnight, keeping your pet in safe, familiar surroundings and routines.",
+    details: [
+      { label: "Overnight care:", value: "10:00 PM–7:00 AM" },
+      { label: "Morning extension:", value: "up to 2 hours, until 9:00 AM — +$20" },
+    ],
+    rates: ["Overnight care — $90/night", "2-hour morning extension (until 9:00 AM) — +$20"],
     image:
       "https://images.unsplash.com/photo-1760791511030-ddad4c350cbb?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
     imageAlt: "Dog relaxing comfortably at home",
@@ -44,12 +76,17 @@ const services = [
     contactOnly: false,
   },
   {
-    number: "03",
+    number: "01",
     id: "drop-ins",
     title: "Drop-In Visits",
     description:
-      "Thoughtful check-ins at home for dogs and cats: feeding, fresh water, play, and companionship. Medication support is available for an extra fee.",
-    rates: ["30 minutes — $30", "45 minutes — $40", "Medication — +$5/visit"],
+      "Short, scheduled check-ins at home for dogs and cats. Medication support is available as an add-on.",
+    details: [
+      { label: "Visits include:", value: "feeding, fresh water, play, and companionship" },
+      { label: "Medication:", value: "+$5 per visit" },
+      { label: "Pets:", value: "dogs and cats" },
+    ],
+    rates: ["30 minutes — $30", "45 minutes — $35"],
     image:
       "https://images.unsplash.com/photo-1616715655554-682697b9128b?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
     imageAlt: "Cat resting comfortably at home",
@@ -58,31 +95,40 @@ const services = [
     contactOnly: false,
   },
   {
-    number: "04",
-    id: "day-care",
-    title: "Doggy Day Care",
-    description:
-      "A friendly, supervised group day from 8:00 AM–5:00 PM, with drop-off from 7:30 AM. Dogs can play and socialize together.",
-    rates: ["Group day care — $35/day"],
-    image:
-      "https://images.unsplash.com/photo-1638766211645-505c1c678b2b?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
-    imageAlt: "A group of dogs playing in a sunlit grassy park",
-    href: "/booking-request?service=Doggy%20Day%20Care",
-    action: "Book day care",
-    contactOnly: false,
-  },
-  {
-    number: "05",
+    number: "02",
     id: "dog-walking",
     title: "Dog Walking",
     description:
-      "Fresh air, exercise, and one-on-one attention. Every walk is tailored to your dog’s pace and routine. Doggie bags are included.",
-    rates: ["30 minutes — $30", "60 minutes — $50"],
+      "Reliable walks with fresh air and exercise, planned around your dog’s routine and energy.",
+    details: [
+      { label: "Included:", value: "doggie bags" },
+      { label: "Available for:", value: "dogs only" },
+    ],
+    rates: ["30 minutes — $25", "60 minutes — $45"],
     image:
       "https://images.unsplash.com/photo-1758633226887-8a1164f408a7?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
     imageAlt: "A person walking a dog through a grassy park",
     href: "/booking-request?service=Dog%20Walking",
     action: "Book a dog walk",
+    contactOnly: false,
+  },
+  {
+    number: "06",
+    id: "extras",
+    title: "Vet Transportation",
+    description:
+      "Need help getting your pet to a vet appointment? We can pick them up, take them to the clinic, and bring them home later if you request a return trip.",
+    details: [
+      { label: "Booking:", value: "on its own or with another service" },
+      { label: "Travel area:", value: "within 15 miles" },
+      { label: "Scheduling:", value: "provide your home, clinic, and appointment details" },
+    ],
+    rates: ["Vet transportation — $35 per one-way trip"],
+    image:
+      "https://images.unsplash.com/photo-1770836037289-e00e5f351d11?auto=format&fit=crop&crop=faces,center&w=1200&h=500&q=85",
+    imageAlt: "A dog receiving a gentle veterinary check-up",
+    href: "/booking-request?service=Vet%20Transportation",
+    action: "Book extras and add-ons",
     contactOnly: false,
   },
 ];
@@ -297,7 +343,7 @@ export default function Home() {
         </div>
 
         <div className="service-grid">
-          {services.map((service) => (
+          {[...services].sort((a, b) => Number(a.number) - Number(b.number)).map((service) => (
             <article className="service-card" id={service.id} key={service.number}>
               <a
                 className="service-photo"
@@ -316,7 +362,15 @@ export default function Home() {
               <div className="service-card-content">
                 <h3>{service.title}</h3>
 
-                <p>{service.description}</p>
+                <div className="service-description">{service.description}</div>
+
+                <ul className="service-details">
+                  {service.details.map((detail) => (
+                    <li key={detail.label}>
+                      <strong>{detail.label}</strong> {detail.value}
+                    </li>
+                  ))}
+                </ul>
 
                 <div className="service-prices">
                   {service.rates.map((rate) => (
@@ -327,8 +381,6 @@ export default function Home() {
                 </div>
 
                 <div className="service-card-bottom">
-                  <span>Reviewed by our team before confirmation</span>
-
                   <a
                     className="book-now-button"
                     href={service.href}
@@ -342,78 +394,6 @@ export default function Home() {
           ))}
         </div>
 
-        {/* ADDITIONAL PRICING DETAILS */}
-        <details className="pricing-note">
-          <summary className="pricing-note-heading">Service details, add-ons &amp; discounts</summary>
-          <div className="pricing-note-content">
-
-          <p>
-            <strong>Dog Walking:</strong> Doggie bags are included.
-           
-          </p>
-
-          <p>
-            <strong>Bathing & Yard Cleanup Add-ons:</strong> Bathing and
-            poop pickup are available by arrangement alongside a booked
-            walk, drop-in, or overnight service. Bathing starts at $25 for
-            small dogs, $35 for medium dogs, and $45+ for large dogs.
-            Yard cleanup starts at $30. Ask about weekly cleanup visits.
-          </p>
-
-          <p>
-            <strong>Vet Transportation:</strong> Before we can provide a
-            ride, we&apos;ll confirm availability and the required signed
-            authorization, appointment details, clinic contact, emergency
-            contact, and relevant pet-care information with you.
-          </p>
-
-          <p>
-            <strong>Doggy Day Care:</strong> Supervised group care is $35/day.
-            Day care runs 8:00 AM–5:00 PM, with drop-off from 7:30–8:00 AM
-            and pickup by 5:00 PM. We&apos;ll review each dog&apos;s comfort
-            around other dogs before confirming.
-          </p>
-
-          <p>
-            <strong>Boarding:</strong> Standard boarding is $40 per night;
-            solo care with no other pets present is $60 per night. Pickup or drop-off is $20 each way
-            within our service area. We&apos;ll confirm the home setup, pet
-            compatibility, and transportation details before accepting a stay.
-          </p>
-
-          <p>
-            <strong>Additional Pets:</strong> 10% off the second pet / 
-            15% off the third pet.
-          </p>
-
-          <p>
-            <strong>Repeat Customers:</strong> Our loyalty
-            reward offers 10% off bookings on the
-            second booking. Multi-pet discounts will be
-            automatically applied in the booking system.
-          </p>
-
-          <p>
-            <strong>Medication during Drop-In Visits:</strong> +$5 per visit.
-            Please include the medication name, dose, timing, and instructions
-            with your request.
-          </p>
-
-          <p>
-            <strong>Flexible Overnight — $80/night:</strong> Care begins at
-            8:00 PM after the caregiver&apos;s other appointments, and runs
-            until 7:00 AM. Add up to two morning hours for $20, with
-            departure by 9:00 AM.
-          </p>
-
-          <p>
-            <strong>Dedicated Overnight — $100/night:</strong> Care runs
-            from 10:00 PM to 7:00 AM without the caregiver leaving for other
-            pet appointments.
-          </p>
-          </div>
-        </details>
-        
       </section>
 
       {/* FOOTER */}

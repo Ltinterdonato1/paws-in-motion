@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { calculateVetTransportSchedule, type VetTransportSchedule } from "@/lib/vet-transport";
 
 type PublicRequest = {
   fullName?: string;
@@ -23,6 +24,12 @@ type PublicRequest = {
   endTime?: string;
   medicationRequired?: boolean;
   medicationInstructions?: string;
+  vetTransportRequired?: boolean;
+  vetTransportDetails?: string;
+  vetTransportTrips?: number;
+  vetDestinationAddress?: string;
+  vetAppointmentAt?: string;
+  vetReturnPickupAt?: string;
   pickup?: boolean;
   dropoff?: boolean;
   soloCare?: boolean;
@@ -37,6 +44,7 @@ const VALID_SERVICES = [
   "Drop-In Visits",
   "Doggy Day Care",
   "House Sitting",
+  "Vet Transportation",
 ] as const;
 
 function fail(message: string, status = 400) {
@@ -99,6 +107,7 @@ export async function POST(request: NextRequest) {
     const petName = String(body.petName ?? "").trim();
     const species = String(body.species ?? "").trim();
     const serviceName = String(body.serviceName ?? "");
+    const vetTransportRequested = Boolean(body.vetTransportRequired) || serviceName === "Vet Transportation";
     const serviceAddress = String(body.serviceAddress ?? "").trim();
     const serviceOption = String(body.serviceOption ?? "");
     const startDate = String(body.startDate ?? "");
@@ -127,7 +136,7 @@ export async function POST(request: NextRequest) {
     if (!(VALID_SERVICES as readonly string[]).includes(serviceName)) {
       return fail("Choose a service from the list.");
     }
-    if (!startDate) return fail("Choose a date for your service.");
+    if (!startDate && serviceName !== "Vet Transportation") return fail("Choose a date for your service.");
     if (
       serviceName !== "Doggy Day Care" &&
       serviceName !== "Boarding" &&
@@ -137,6 +146,9 @@ export async function POST(request: NextRequest) {
     }
     if (serviceName === "Boarding" && (body.pickup || body.dropoff) && !serviceAddress) {
       return fail("Add the address for boarding pickup or drop-off.");
+    }
+    if (vetTransportRequested && !serviceAddress) {
+      return fail("Add your home address for vet transportation pickup.");
     }
 
     const petSpecies = species.toLowerCase();
@@ -150,7 +162,7 @@ export async function POST(request: NextRequest) {
       return fail(`${serviceName} is currently available for dogs only.`);
     }
     if (
-      (serviceName === "Boarding" || serviceName === "Doggy Day Care") &&
+      (serviceName === "Boarding" || (serviceName === "Doggy Day Care" && !body.soloCare)) &&
       !String(body.getsAlongWithPets ?? "").trim()
     ) {
       return fail("Tell us how your dog does around other pets.");
@@ -158,32 +170,67 @@ export async function POST(request: NextRequest) {
     if (serviceName === "Drop-In Visits" && body.medicationRequired && !String(body.medicationInstructions ?? "").trim()) {
       return fail("Please add the medication instructions.");
     }
+    const vetTransportTrips = vetTransportRequested ? Number(body.vetTransportTrips) : 0;
+    if (vetTransportRequested && ![1, 2].includes(vetTransportTrips)) {
+      return fail("Choose one-way or round-trip vet transportation.");
+    }
+    if (vetTransportRequested && (!String(body.vetDestinationAddress ?? "").trim() || !String(body.vetAppointmentAt ?? "").trim())) {
+      return fail("Add the vet address and appointment date and time.");
+    }
+    if (vetTransportRequested && vetTransportTrips === 2 && !String(body.vetReturnPickupAt ?? "").trim()) {
+      return fail("Choose when your pet will be ready for pickup at the vet.");
+    }
+    let vetTransportSchedule: VetTransportSchedule | null = null;
+    if (vetTransportRequested) {
+      try {
+        vetTransportSchedule = await calculateVetTransportSchedule({
+          pickupAddress: serviceAddress,
+          vetAddress: String(body.vetDestinationAddress),
+          appointmentAt: String(body.vetAppointmentAt),
+          returnPickupAt: vetTransportTrips === 2 ? String(body.vetReturnPickupAt) : null,
+        });
+      } catch (scheduleError) {
+        const message = scheduleError instanceof Error ? scheduleError.message : "We couldn’t calculate the vet route.";
+        return fail(message, message.includes("not set up yet") ? 503 : 400);
+      }
+    }
 
     let serviceStart: Date;
     let serviceEnd: Date;
     let price: number;
     let option: string;
     let endSummaryDate = endDate;
+    const vetTransportFee = vetTransportTrips * 35;
 
-    if (serviceName === "Boarding") {
+    if (serviceName === "Vet Transportation") {
+      if (!vetTransportSchedule) return fail("Calculate the vet transportation schedule before submitting.");
+      serviceStart = new Date(vetTransportSchedule.pickupAt);
+      serviceEnd = new Date(vetTransportSchedule.appointmentAt);
+      option = vetTransportTrips === 1 ? "One-way vet transportation" : "Round-trip vet transportation";
+      price = 0;
+      endSummaryDate = new Date(vetTransportSchedule.appointmentAt).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    } else if (serviceName === "Boarding") {
       const nights = nightsBetween(startDate, endDate);
       if (!nights) return fail("Boarding checkout must be at least one day after drop-off.");
-      serviceStart = makeLocalDate(startDate, "15:00")!;
-      serviceEnd = makeLocalDate(endDate, "10:00")!;
+      const isValidBoardingPickupTime = (time: string) =>
+        /^([01]\d|2[0-3]):[0-5]\d$/.test(time) && time >= "07:00" && time <= "18:00";
+      const isValidBoardingDropoffTime = startTime === "20:00";
+      if (!isValidBoardingDropoffTime || !isValidBoardingPickupTime(endTime)) {
+        return fail("Boarding drop-off is at 8:00 PM. Pickup must be between 7:00 AM and 6:00 PM; pickups after 8:00 AM require team confirmation for any daytime boarding charge.");
+      }
+      serviceStart = makeLocalDate(startDate, startTime)!;
+      serviceEnd = makeLocalDate(endDate, endTime)!;
       option = body.soloCare ? "Solo care" : "Standard boarding";
-      price = (body.soloCare ? 60 : 40) * nights + (body.pickup ? 20 : 0) + (body.dropoff ? 20 : 0);
+      price = (body.soloCare ? 55 : 40) * nights + (body.pickup ? 20 : 0) + (body.dropoff ? 20 : 0);
       endSummaryDate = endDate;
     } else if (serviceName === "House Sitting") {
       const nights = nightsBetween(startDate, endDate);
       if (!nights) return fail("House-sitting checkout must be at least one day after check-in.");
-      option = serviceOption === "Dedicated overnight" ? "Dedicated overnight" : "Flexible overnight";
-      if (body.extendedMorning && option !== "Flexible overnight") {
-        return fail("The two-hour extension is only available with flexible overnight care.");
-      }
-      serviceStart = makeLocalDate(startDate, option === "Dedicated overnight" ? "22:00" : "20:00")!;
+      option = "Overnight care";
+      serviceStart = makeLocalDate(startDate, "22:00")!;
       serviceEnd = makeLocalDate(endDate, body.extendedMorning ? "09:00" : "07:00")!;
       const extension = body.extendedMorning ? 20 : 0;
-      price = (option === "Dedicated overnight" ? 100 : 80) * nights + extension;
+      price = 90 * nights + extension;
     } else {
       serviceStart = makeLocalDate(startDate, startTime)!;
       if (!serviceStart || serviceStart <= new Date()) return fail("Choose a future date and time.");
@@ -191,22 +238,22 @@ export async function POST(request: NextRequest) {
       if (serviceName === "Dog Walking") {
         option = serviceOption === "60 minutes" ? "60 minutes" : "30 minutes";
         serviceEnd = new Date(serviceStart.getTime() + (option === "60 minutes" ? 60 : 30) * 60000);
-        price = option === "60 minutes" ? 50 : 30;
+        price = option === "60 minutes" ? 45 : 25;
       } else if (serviceName === "Drop-In Visits") {
         option = serviceOption === "45 minutes" ? "45 minutes" : "30 minutes";
         serviceEnd = new Date(serviceStart.getTime() + (option === "45 minutes" ? 45 : 30) * 60000);
-        price = option === "45 minutes" ? 40 : 30;
+        price = option === "45 minutes" ? 35 : 30;
       } else {
-        if (!/^07:(30|45)$|^08:00$/.test(startTime)) {
-          return fail("Day-care drop-off is available between 7:30 AM and 8:00 AM.");
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) || startTime < "07:00" || startTime > "18:00") {
+          return fail("Day-care drop-off is available from 7:00 AM through 6:00 PM.");
         }
-        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) || endTime > "17:00" || endTime < "08:00") {
-          return fail("Day-care pickup must be between 8:00 AM and 5:00 PM.");
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) || endTime > "19:00" || endTime < "07:30") {
+          return fail("Day-care pickup must be between 7:30 AM and 7:00 PM.");
         }
-        option = "Group care — $35/day";
+        option = body.soloCare ? "One-on-one day care at a caregiver’s home — $90/day" : "Group day care — $45/day";
         serviceEnd = makeLocalDate(startDate, endTime)!;
         if (!serviceEnd || serviceEnd <= serviceStart) return fail("Choose an end time after the day-care start time.");
-        price = 35;
+        price = body.soloCare ? 90 : 45;
       }
       endSummaryDate = startDate;
     }
@@ -284,15 +331,58 @@ export async function POST(request: NextRequest) {
       createdNewPet = true;
     }
 
+    let petDiscountRate = 0;
+    if (accountId && petId) {
+      const { data: householdPets, error: householdPetsError } = await admin
+        .from("pets")
+        .select("id")
+        .eq("owner_id", accountId)
+        .order("created_at", { ascending: true });
+      if (householdPetsError) throw householdPetsError;
+      const petRank = (householdPets ?? []).findIndex((pet) => pet.id === petId) + 1;
+      if (petRank === 2) petDiscountRate = 10;
+      if (petRank === 3) petDiscountRate = 15;
+    }
+
+    const priorBookingQueries = [];
+    if (accountId) {
+      priorBookingQueries.push(
+        admin.from("bookings").select("id, status").eq("customer_id", accountId)
+      );
+    }
+    priorBookingQueries.push(
+      admin.from("bookings").select("id, status").eq("guest_email", email)
+    );
+    const priorBookingResults = await Promise.all(priorBookingQueries);
+    const priorBookings = new Map<string, string>();
+    for (const result of priorBookingResults) {
+      if (result.error) throw result.error;
+      for (const priorBooking of result.data ?? []) {
+        priorBookings.set(priorBooking.id, String(priorBooking.status ?? ""));
+      }
+    }
+    const validPriorBookings = [...priorBookings.values()].filter((status) =>
+      !["cancelled", "canceled", "rejected", "declined"].includes(status.toLowerCase())
+    );
+    const loyaltyDiscountRate = validPriorBookings.length === 1 ? 10 : 0;
+    const discountRate = petDiscountRate + loyaltyDiscountRate;
+    const discountAmount = Math.round(price * discountRate) / 100;
+    const medicationFee = body.medicationRequired && serviceName === "Drop-In Visits" ? 5 : 0;
+    const estimatedTotal = Math.max(0, price + medicationFee + vetTransportFee - discountAmount);
+
     const summary = [
       `Pet: ${petName} (${petSpecies})${String(body.breed ?? "").trim() ? `, ${String(body.breed).trim()}` : ""}.`,
       petNotes ? `Pet care information: ${petNotes}` : "",
       body.getsAlongWithPets ? `Gets along with other pets: ${body.getsAlongWithPets}` : "",
       body.notes?.trim(),
+      vetTransportRequested && vetTransportSchedule ? `Vet transportation: ${vetTransportTrips === 1 ? "one way ($35)" : "drop-off and return ($35 each way)"}. Home pickup: ${new Date(vetTransportSchedule.pickupAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; vet appointment: ${new Date(vetTransportSchedule.appointmentAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; route: ${vetTransportSchedule.outboundDistanceMiles} miles, ${vetTransportSchedule.outboundDriveMinutes} minutes plus 10 minutes for traffic variability and 5 minutes for arrival buffer. Vet: ${String(body.vetDestinationAddress).trim()}.${vetTransportSchedule.returnPickupAt ? ` Return pickup: ${new Date(vetTransportSchedule.returnPickupAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; estimated home arrival: ${new Date(vetTransportSchedule.returnArrivalAt!).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} (${vetTransportSchedule.returnDriveMinutes} minutes).` : ""} ${String(body.vetTransportDetails ?? "").trim()}` : "",
       serviceAddress ? `Service / transport address: ${serviceAddress}` : "",
       serviceName === "Boarding" ? `Solo care: ${body.soloCare ? "yes" : "no"}. Pickup: ${body.pickup ? "yes" : "no"}. Drop-off: ${body.dropoff ? "yes" : "no"}.` : "",
-      serviceName === "Doggy Day Care" ? "Day-care setting: supervised group care with other dogs." : "",
+      serviceName === "Boarding" && endTime > "08:00" ? "Requested pickup is after 8:00 AM; confirm any daytime boarding charge with the customer before approval." : "",
+      serviceName === "Doggy Day Care" ? `Day-care setting: ${body.soloCare ? "daytime boarding, one-on-one care at a caregiver’s home" : "supervised group care with other dogs"}.` : "",
       body.medicationRequired ? `Medication instructions: ${String(body.medicationInstructions ?? "").trim()}` : "",
+      petDiscountRate ? `Multi-pet discount: ${petDiscountRate}% for pet number ${petDiscountRate === 10 ? "two" : "three"}.` : "",
+      loyaltyDiscountRate ? "Second-booking loyalty discount: 10%." : "",
     ].filter(Boolean).join("\n");
 
     const { data: booking, error: bookingError } = await admin
@@ -309,9 +399,11 @@ export async function POST(request: NextRequest) {
         status: "pending",
         request_notes: summary || null,
         estimated_subtotal: price,
-        medication_fee: body.medicationRequired && serviceName === "Drop-In Visits" ? 5 : 0,
-        discount_amount: 0,
-        estimated_total: price + (body.medicationRequired && serviceName === "Drop-In Visits" ? 5 : 0),
+        medication_fee: medicationFee,
+        vet_transport_fee: vetTransportFee,
+        vet_transport_trips: vetTransportTrips,
+        discount_amount: discountAmount,
+        estimated_total: estimatedTotal,
       })
       .select("id")
       .single();
@@ -323,11 +415,12 @@ export async function POST(request: NextRequest) {
       petNotes ? `Pet care information: ${petNotes}` : "",
       body.getsAlongWithPets ? `Gets along with other pets: ${body.getsAlongWithPets}` : "",
       body.notes?.trim(),
-      serviceAddress ? `Service / transport address: ${serviceAddress}` : "",
+      vetTransportRequested && vetTransportSchedule ? `Vet transportation: ${vetTransportTrips === 1 ? "one way ($35)" : "drop-off and return ($35 each way)"}. Home pickup: ${new Date(vetTransportSchedule.pickupAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; vet appointment: ${new Date(vetTransportSchedule.appointmentAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; route: ${vetTransportSchedule.outboundDistanceMiles} miles, ${vetTransportSchedule.outboundDriveMinutes} minutes plus 10 minutes for traffic variability and 5 minutes for arrival buffer. Vet: ${String(body.vetDestinationAddress).trim()}.${vetTransportSchedule.returnPickupAt ? ` Return pickup: ${new Date(vetTransportSchedule.returnPickupAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}; estimated home arrival: ${new Date(vetTransportSchedule.returnArrivalAt!).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} (${vetTransportSchedule.returnDriveMinutes} minutes).` : ""} ${String(body.vetTransportDetails ?? "").trim()}` : "",
+      serviceAddress ? `${serviceName === "Vet Transportation" ? "Home pickup address" : "Service / transport address"}: ${serviceAddress}` : "",
       serviceName === "Boarding" ? `Solo care: ${body.soloCare ? "yes" : "no"}; pickup: ${body.pickup ? "yes" : "no"}; drop-off: ${body.dropoff ? "yes" : "no"}.` : "",
-      serviceName === "Doggy Day Care" ? "Day-care setting: supervised group care with other dogs. Compatibility must be reviewed before approval." : "",
+      serviceName === "Doggy Day Care" ? `Day-care setting: ${body.soloCare ? "daytime boarding, one-on-one care at a caregiver’s home" : "supervised group care with other dogs"}.${body.soloCare ? "" : " Compatibility must be reviewed before approval."}` : "",
     ].filter(Boolean).join("\n");
-    const { error: itemError } = await admin.from("booking_services").insert({
+    const { error: itemError } = serviceName === "Vet Transportation" ? { error: null } : await admin.from("booking_services").insert({
       booking_id: bookingId,
       pet_id: petId,
       pet_name: petName,
@@ -344,7 +437,53 @@ export async function POST(request: NextRequest) {
     });
     if (itemError) throw itemError;
 
-    return NextResponse.json({ success: true, bookingId, serviceName, endDate: endSummaryDate });
+    if (vetTransportSchedule) {
+      const pickupNotes = `Pickup address: ${serviceAddress}. Vet address: ${String(body.vetDestinationAddress).trim()}. Appointment: ${new Date(vetTransportSchedule.appointmentAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}. Traffic-aware drive estimate: ${vetTransportSchedule.outboundDriveMinutes} minutes (${vetTransportSchedule.outboundDistanceMiles} miles) plus 10 minutes for traffic variability and 5 minutes for arrival buffer. ${String(body.vetTransportDetails ?? "").trim()}`;
+      const transportEvents = [{
+        booking_id: bookingId,
+        pet_id: petId,
+        pet_name: petName,
+        pet_species: petSpecies,
+        pet_breed: String(body.breed ?? "").trim() || null,
+        service_name: "Vet Transportation",
+        service_option: `Home pickup ${serviceAddress} → vet drop-off ${String(body.vetDestinationAddress).trim()}`,
+        service_start: vetTransportSchedule.pickupAt,
+        service_end: vetTransportSchedule.appointmentAt,
+        price: 0,
+        service_notes: pickupNotes,
+        medication_required: false,
+        medication_instructions: "",
+      }];
+      if (vetTransportSchedule.returnPickupAt && vetTransportSchedule.returnArrivalAt) {
+        transportEvents.push({
+          booking_id: bookingId,
+          pet_id: petId,
+          pet_name: petName,
+          pet_species: petSpecies,
+          pet_breed: String(body.breed ?? "").trim() || null,
+          service_name: "Vet Transportation",
+          service_option: `Vet pickup ${String(body.vetDestinationAddress).trim()} → home ${serviceAddress}`,
+          service_start: vetTransportSchedule.returnPickupAt,
+          service_end: vetTransportSchedule.returnArrivalAt,
+          price: 0,
+          service_notes: `Vet address: ${String(body.vetDestinationAddress).trim()}. Home address: ${serviceAddress}. Return drive estimate: ${vetTransportSchedule.returnDriveMinutes} minutes. ${String(body.vetTransportDetails ?? "").trim()}`,
+          medication_required: false,
+          medication_instructions: "",
+        });
+      }
+      const { error: transportEventsError } = await admin.from("booking_services").insert(transportEvents);
+      if (transportEventsError) throw transportEventsError;
+    }
+
+    return NextResponse.json({
+      success: true,
+      bookingId,
+      serviceName,
+      endDate: endSummaryDate,
+      vetTransportSchedule,
+      discountAmount,
+      estimatedTotal,
+    });
   } catch (error) {
     if (admin && bookingId) await admin.from("bookings").delete().eq("id", bookingId);
     if (admin && createdNewPet && petId) {

@@ -19,6 +19,7 @@ type Booking = {
   request_notes: string | null;
   assigned_employee_id: string | null;
   estimated_total: number | string | null;
+  late_pickup_review_required?: boolean;
 };
 
 type Profile = {
@@ -36,12 +37,14 @@ type ProfileDraft = {
 };
 
 type BookingService = {
+  id: string;
   booking_id: string;
   service_name: string | null;
   service_start: string;
   service_end: string;
   service_option: string | null;
   service_notes: string | null;
+  completed_at: string | null;
 };
 
 export default function AdminPage() {
@@ -135,7 +138,7 @@ export default function AdminPage() {
         supabase
           .from("bookings")
           .select(
-            "id, customer_id, guest_name, guest_email, guest_phone, service_name, booking_date, status, request_notes, assigned_employee_id, estimated_total"
+            "id, customer_id, guest_name, guest_email, guest_phone, service_name, booking_date, status, request_notes, assigned_employee_id, estimated_total, late_pickup_review_required"
           )
           .order("booking_date", { ascending: true }),
 
@@ -160,7 +163,7 @@ export default function AdminPage() {
 
         const { data: serviceRows, error: serviceError } = await supabase
           .from("booking_services")
-          .select("booking_id, service_name, service_option, service_notes, service_start, service_end")
+          .select("id, booking_id, service_name, service_option, service_notes, service_start, service_end, completed_at")
           .in("booking_id", bookingIds)
           .order("service_start", { ascending: true });
 
@@ -933,6 +936,11 @@ export default function AdminPage() {
                         <h3 style={styles.bookingTitle}>
                           {booking.service_name || "Pet care service"}
                         </h3>
+                        {booking.late_pickup_review_required && (
+                          <p role="alert" style={styles.latePickupAlert}>
+                            Late pickup reported — review the fee before creating the invoice.
+                          </p>
+                        )}
                         <p style={styles.detailText}>
                           Customer:{" "}
                           {customer?.full_name ||
@@ -996,6 +1004,19 @@ export default function AdminPage() {
                                   minute: "2-digit",
                                   timeZone: "America/Los_Angeles",
                                 }
+                              )}
+                              {service.service_name === "Vet Transportation" && booking.status === "approved" && (
+                                <span style={{ display: "block", marginTop: 8 }}>
+                                  {service.completed_at ? (
+                                    <strong>Trip completed</strong>
+                                  ) : (
+                                    <CompleteJobButton
+                                      bookingId={booking.id}
+                                      serviceItemId={service.id}
+                                      onCompleted={() => void loadData()}
+                                    />
+                                  )}
+                                </span>
                               )}
                             </span>
                           ))
@@ -1091,9 +1112,11 @@ export default function AdminPage() {
                         </select>
                       </label>
 
-                      {booking.status === "approved" && (
+                      {booking.status === "approved" && !(bookingServices[booking.id] ?? []).some((service) => service.service_name === "Vet Transportation") && (
                         <CompleteJobButton
                           bookingId={booking.id}
+                          isDayCare={booking.service_name === "Doggy Day Care"}
+                          isBoarding={booking.service_name === "Boarding"}
                           onCompleted={() => void loadData()}
                         />
                       )}
@@ -1121,6 +1144,16 @@ export default function AdminPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  latePickupAlert: {
+    margin: "0 0 10px",
+    padding: "10px 12px",
+    border: "1px solid #f2c879",
+    borderRadius: 10,
+    background: "#fff6dd",
+    color: "#744b0b",
+    fontWeight: 700,
+    fontSize: 13,
+  },
   page: {
     minHeight: "100vh",
     background: "#f5f7f6",

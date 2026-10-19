@@ -21,6 +21,7 @@ type BookingService = {
   service_notes: string | null;
   medication_required: boolean;
   medication_instructions: string | null;
+  completed_at: string | null;
 };
 
 export default function EmployeeJobPage({
@@ -66,7 +67,7 @@ async function EmployeeJobContent({
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
     .select(
-      "id, customer_id, guest_name, guest_email, guest_phone, assigned_employee_id, service_name, booking_date, status, request_notes, estimated_subtotal, medication_fee, discount_amount, estimated_total"
+      "id, customer_id, guest_name, guest_email, guest_phone, assigned_employee_id, service_name, booking_date, status, request_notes, estimated_subtotal, medication_fee, vet_transport_fee, vet_transport_trips, discount_amount, estimated_total, late_pickup_review_required"
     )
     .eq("id", id)
     .maybeSingle();
@@ -92,7 +93,7 @@ async function EmployeeJobContent({
   const { data: services, error: servicesError } = await supabase
     .from("booking_services")
     .select(
-      "id, service_name, service_option, service_start, service_end, price, service_notes, medication_required, medication_instructions"
+      "id, service_name, service_option, service_start, service_end, price, service_notes, medication_required, medication_instructions, completed_at"
     )
     .eq("booking_id", booking.id)
     .order("service_start", { ascending: true });
@@ -217,7 +218,7 @@ async function EmployeeJobContent({
                     </div>
 
                     <p className="font-semibold">
-                      {money(service.price)}
+                      {service.service_name === "Vet Transportation" ? "Schedule event" : money(service.price)}
                     </p>
                   </div>
 
@@ -249,6 +250,21 @@ async function EmployeeJobContent({
                       )}
                     </div>
                   )}
+
+                  {service.service_name === "Vet Transportation" && (
+                    <div className="mt-4">
+                      {service.completed_at ? (
+                        <p className="text-sm font-semibold text-green-800">
+                          Trip completed · {dateTime(service.completed_at)}
+                        </p>
+                      ) : booking.status === "approved" ? (
+                        <CompleteJobButton
+                          bookingId={booking.id}
+                          serviceItemId={service.id}
+                        />
+                      ) : null}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -268,6 +284,11 @@ async function EmployeeJobContent({
               <span className="text-[#5d6f63]">Medication fee</span>
               <span>{money(booking.medication_fee)}</span>
             </div>
+
+            {Number(booking.vet_transport_fee) > 0 && <div className="flex justify-between gap-4">
+              <span className="text-[#5d6f63]">Vet transportation ({Number(booking.vet_transport_trips) === 1 ? "one way" : "return trip"})</span>
+              <span>{money(booking.vet_transport_fee)}</span>
+            </div>}
 
             <div className="flex justify-between gap-4">
               <span className="text-[#5d6f63]">Discount</span>
@@ -291,11 +312,21 @@ async function EmployeeJobContent({
               <h2 className="font-semibold">Ready for completion</h2>
 
               <p className="mb-4 mt-2 text-sm text-[#5d6f63]">
-                Once the service has been performed, complete the job
-                below to create the customer invoice.
+                {booking.late_pickup_review_required
+                  ? "Late pickup was reported. An admin will review any applicable fee and send the invoice."
+                  : Number(booking.vet_transport_trips) > 0
+                  ? "Mark each vet trip complete. The customer receives one invoice after the final trip."
+                  : "Once the service has been performed, complete the job below to create the customer invoice."}
               </p>
 
-              <CompleteJobButton bookingId={booking.id} />
+              {!booking.late_pickup_review_required && Number(booking.vet_transport_trips) === 0 && (
+                <CompleteJobButton
+                  bookingId={booking.id}
+                  isDayCare={user.role === "admin" && booking.service_name === "Doggy Day Care"}
+                  isBoarding={user.role === "admin" && booking.service_name === "Boarding"}
+                  allowLatePickupReport={user.role === "employee" && booking.service_name === "Doggy Day Care"}
+                />
+              )}
             </div>
           ) : booking.status === "completed" ? (
             <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-green-900">

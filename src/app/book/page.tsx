@@ -11,6 +11,7 @@ type Pet = {
   name: string;
   species: string | null;
   breed: string | null;
+  created_at: string;
 };
 
 type ServiceName =
@@ -22,8 +23,7 @@ type ServiceOption =
   | "30 minutes"
   | "45 minutes"
   | "60 minutes"
-  | "Flexible overnight"
-  | "Dedicated overnight";
+  | "Overnight care";
 
 type ServiceDraft = {
   id: string;
@@ -40,7 +40,6 @@ type ServiceDraft = {
 };
 
 const MEDICATION_FEE = 5;
-const MULTI_PET_DISCOUNT = 10;
 
 const BLOCKED_START_MINUTES = 7 * 60 + 30;
 const BLOCKED_END_MINUTES = 17 * 60 + 30;
@@ -76,8 +75,7 @@ function formatTimeLabel(time: string) {
   return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-const FLEXIBLE_OVERNIGHT_START = "20:00";
-const DEDICATED_OVERNIGHT_START = "22:00";
+const OVERNIGHT_START = "22:00";
 const DROP_IN_START_OPTIONS = buildTimeOptions("06:00", "22:00");
 
 const OVERNIGHT_END_TIME = "07:00";
@@ -85,10 +83,7 @@ const OVERNIGHT_END_TIME = "07:00";
 const SERVICE_OPTIONS: Record<ServiceName, ServiceOption[]> = {
   "Dog Walking": ["30 minutes", "60 minutes"],
   "Drop-In Visits": ["30 minutes", "45 minutes"],
-  "Pet Sitting & Overnight Care": [
-    "Flexible overnight",
-    "Dedicated overnight",
-  ],
+  "Pet Sitting & Overnight Care": ["Overnight care"],
 };
 
 const ALL_SERVICES: ServiceName[] = [
@@ -278,11 +273,11 @@ function getOvernightNights(draft: ServiceDraft) {
 
 function getPrice(draft: ServiceDraft): number | null {
   if (draft.serviceName === "Dog Walking") {
-    return draft.serviceOption === "60 minutes" ? 50 : 30;
+    return draft.serviceOption === "60 minutes" ? 45 : 25;
   }
 
   if (draft.serviceName === "Drop-In Visits") {
-    return draft.serviceOption === "45 minutes" ? 40 : 30;
+    return draft.serviceOption === "45 minutes" ? 35 : 30;
   }
 
   if (
@@ -307,10 +302,7 @@ function getPrice(draft: ServiceDraft): number | null {
     return null;
   }
 
-  const nightlyRate =
-    draft.serviceOption === "Dedicated overnight" ? 100 : 80;
-
-  return nightlyRate * nights;
+  return 90 * nights;
 }
 
 function formatPrice(price: number | null) {
@@ -324,11 +316,8 @@ function isOvernightService(draft: ServiceDraft) {
 function getOvernightTimeError(draft: ServiceDraft) {
   if (!isOvernightService(draft)) return "";
 
-  const expectedStart = draft.serviceOption === "Dedicated overnight"
-    ? DEDICATED_OVERNIGHT_START
-    : FLEXIBLE_OVERNIGHT_START;
-  if (draft.startTime !== expectedStart) {
-    return `Please choose the ${formatTimeLabel(expectedStart)} start time for this overnight option.`;
+  if (draft.startTime !== OVERNIGHT_START) {
+    return `Please choose the ${formatTimeLabel(OVERNIGHT_START)} start time for overnight care.`;
   }
 
   if (draft.endTime !== OVERNIGHT_END_TIME) {
@@ -378,7 +367,7 @@ const [today, setToday] = useState("");
 
       const { data: petData, error: petError } = await supabase
         .from("pets")
-        .select("id, name, species, breed")
+        .select("id, name, species, breed, created_at")
         .eq("owner_id", data.user.id)
         .order("created_at", { ascending: false });
 
@@ -430,7 +419,8 @@ const [today, setToday] = useState("");
           }
 
           if (updated.serviceName === "Pet Sitting & Overnight Care") {
-            updated.startTime = FLEXIBLE_OVERNIGHT_START;
+            updated.serviceOption = "Overnight care";
+            updated.startTime = OVERNIGHT_START;
             updated.endDate = addDays(updated.startDate, 1);
             updated.endTime = OVERNIGHT_END_TIME;
           } else if (
@@ -445,9 +435,8 @@ const [today, setToday] = useState("");
           changes.serviceOption &&
           updated.serviceName === "Pet Sitting & Overnight Care"
         ) {
-          updated.startTime = updated.serviceOption === "Dedicated overnight"
-            ? DEDICATED_OVERNIGHT_START
-            : FLEXIBLE_OVERNIGHT_START;
+          updated.serviceOption = "Overnight care";
+          updated.startTime = OVERNIGHT_START;
         }
 
         if (
@@ -512,12 +501,26 @@ const [today, setToday] = useState("");
     0
   );
 
-  const selectedPetCount = new Set(
-    services.map((service) => service.petId).filter(Boolean)
-  ).size;
-
-  const discountAmount =
-    selectedPetCount >= 2 ? MULTI_PET_DISCOUNT : 0;
+  const petRankById = new Map(
+    [...pets]
+      .sort((first, second) => first.created_at.localeCompare(second.created_at))
+      .map((pet, index) => [pet.id, index + 1])
+  );
+  const petSubtotals = new Map<string, number>();
+  for (const service of services) {
+    if (!service.petId) continue;
+    petSubtotals.set(
+      service.petId,
+      (petSubtotals.get(service.petId) ?? 0) + (getPrice(service) ?? 0)
+    );
+  }
+  const discountAmount = Math.round(
+    [...petSubtotals.entries()].reduce((sum, [petId, petSubtotal]) => {
+      const petRank = petRankById.get(petId);
+      const discountRate = petRank === 2 ? 0.1 : petRank === 3 ? 0.15 : 0;
+      return sum + petSubtotal * discountRate;
+    }, 0) * 100
+  ) / 100;
 
   const medicationFee = services.filter(
     (service) =>
@@ -619,7 +622,7 @@ const [today, setToday] = useState("");
 
     if (hasInvalidOvernight) {
       setError(
-        "Please check your overnight dates and times. Flexible care starts at 8:00 PM; dedicated care starts at 10:00 PM. Both end at 7:00 AM."
+        "Please check your overnight dates and times. Overnight care starts at 10:00 PM and ends at 7:00 AM."
       );
       return;
     }
@@ -809,7 +812,7 @@ const [today, setToday] = useState("");
                     >
                       {SERVICE_OPTIONS[service.serviceName].map((option) => (
                         <option key={option} value={option}>
-                          {option === "Flexible overnight" ? "Flexible overnight (8:00 PM–7:00 AM)" : option === "Dedicated overnight" ? "Dedicated overnight (10:00 PM–7:00 AM)" : option}
+                          {option === "Overnight care" ? "Overnight care (10:00 PM–7:00 AM)" : option}
                         </option>
                       ))}
                     </select>
@@ -865,7 +868,7 @@ const [today, setToday] = useState("");
                           })
                         }
                       >
-                        <option value={service.serviceOption === "Dedicated overnight" ? DEDICATED_OVERNIGHT_START : FLEXIBLE_OVERNIGHT_START}>
+                        <option value={OVERNIGHT_START}>
                           {formatTimeLabel(service.startTime)}
                         </option>
                       </select>
@@ -898,9 +901,8 @@ const [today, setToday] = useState("");
 
                     {isOvernightService(service) && (
                       <small>
-                        Flexible overnight begins at 8:00 PM, after other
-                        appointments, and ends at 7:00 AM. Dedicated overnight
-                        runs 10:00 PM–7:00 AM without other pet appointments.
+                        Overnight care runs from 10:00 PM to 7:00 AM, with a
+                        caregiver staying with your pet.
                         A two-hour extension until 9:00 AM is $20 and must be
                         requested in the instructions below. For earlier care,
                         request a separate Drop-In Visit.
@@ -1118,7 +1120,7 @@ const [today, setToday] = useState("");
                   </div>
                   <div className="booking-price-row">
                     <span>
-                      Multi-pet discount{selectedPetCount >= 2 ? " applied" : ""}
+                      Multi-pet discount{discountAmount > 0 ? " applied" : ""}
                     </span>
                     <strong className={discountAmount > 0 ? "booking-discount" : ""}>
                       {discountAmount > 0
@@ -1127,9 +1129,9 @@ const [today, setToday] = useState("");
                     </strong>
                   </div>
                   <small>
-                    {selectedPetCount >= 2
-                      ? `Discount applied for ${selectedPetCount} different pets.`
-                      : "Select services for at least two different pets to receive $10 off."}
+                    10% applies to the second pet and 15% to the third pet.
+                    The 10% second-booking loyalty discount is applied
+                    automatically when eligible.
                   </small>
                 </div>
               </div>
